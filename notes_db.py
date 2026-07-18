@@ -24,9 +24,14 @@ def _get_conn():
 def init_db():
     """Load notes from GitHub on startup."""
     global _data_cache, _data_sha, _last_load
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if token:
+        logger.info("GITHUB_TOKEN found, loading notes from GitHub...")
+    else:
+        logger.warning("NO GITHUB_TOKEN found! Notes will NOT persist!")
     _data_cache = _load_from_github()
     _last_load = time.time()
-    logger.info("Notes loaded from GitHub: %d notes", _count_notes())
+    logger.info("Notes loaded: %d notes, SHA: %s", _count_notes(), _data_sha or "none")
 
 
 def _load_from_github():
@@ -138,7 +143,8 @@ def add_note(user_id, username, book_title, rating, note_text):
         "deleted": False,
     }
     data["notes"].append(note)
-    _save_to_github(data)
+    saved = _save_to_github(data)
+    logger.info("Note saved: id=%d saved_to_github=%s total=%d", note_id, saved, len(data["notes"]))
     return note_id
 
 
