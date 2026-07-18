@@ -415,6 +415,10 @@ async def notes_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
 
+    # Only handle notes-related callbacks
+    if not data or not any(data.startswith(p) for p in ["noteview", "userdel", "admindel", "admin_delall", "noteclose", "mynotedetail", "noop"]):
+        return  # Let other callback handlers process this
+
     if data == "noop":
         return
 
