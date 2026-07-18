@@ -151,6 +151,7 @@ ALLOWED_DOMAINS = [
     "twitter.com", "x.com",
     "tiktok.com",
     "blogspot.com", "whispermmepub.github.io", "saroatsin.com",
+    "wikipedia.org",
 ]
 
 ALLOWED_TG_CHANNELS = ["TheBookR", "refthebook"]
