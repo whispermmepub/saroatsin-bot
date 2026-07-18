@@ -22,6 +22,17 @@ ADMIN_USERNAMES = ["wowepub"]
 
 _stars = lambda n: "⭐" * n + "☆" * (5 - n)
 
+AUTO_DELETE_SECONDS = 30
+
+async def _auto_delete_message(ctx, chat_id, message_id, delay=AUTO_DELETE_SECONDS):
+    """Delete a message after delay seconds."""
+    try:
+        import asyncio
+        await asyncio.sleep(delay)
+        await ctx.bot.delete_message(chat_id=chat_id, message_id=message_id)
+    except Exception as e:
+        logger.debug("Auto-delete failed (msg may be deleted already): %s", e)
+
 
 def _is_admin(update):
     user = update.effective_user
@@ -62,7 +73,7 @@ async def cmd_addnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             )
             stars = _stars(rating)
             logger.info("Note saved directly: id=%d user=%s book=%s", note_id, user.username, book_title)
-            await update.message.reply_text(
+            sent = await update.message.reply_text(
                 f"✅ *Note saved!*\n\n"
                 f"📖 {book_title}\n"
                 f"Rating: {stars}\n"
@@ -70,6 +81,10 @@ async def cmd_addnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 f"🆔 Note #{note_id}",
                 parse_mode="Markdown",
             )
+            # Auto-delete in groups
+            if update.effective_chat.type in ("group", "supergroup"):
+                asyncio.create_task(_auto_delete_message(ctx, update.effective_chat.id, sent.message_id))
+                asyncio.create_task(_auto_delete_message(ctx, update.effective_chat.id, update.message.message_id))
             return
 
         if " - " in text:
@@ -123,7 +138,7 @@ async def handle_note_reply(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         logger.info("Saving note: user=%s book=%s rating=%d", username, book_title, rating)
         note_id = add_note(user_id, username, book_title, rating, note_text)
         stars = _stars(rating)
-        await update.message.reply_text(
+        sent = await update.message.reply_text(
             f"✅ *Note saved!*\n\n"
             f"📖 {book_title}\n"
             f"Rating: {stars}\n"
@@ -131,6 +146,10 @@ async def handle_note_reply(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"🆔 Note #{note_id}",
             parse_mode="Markdown",
         )
+        # Auto-delete in groups
+        if update.effective_chat.type in ("group", "supergroup"):
+            asyncio.create_task(_auto_delete_message(ctx, update.effective_chat.id, sent.message_id))
+            asyncio.create_task(_auto_delete_message(ctx, update.effective_chat.id, update.message.message_id))
     except Exception as e:
         logger.error("add_note error: %s", e)
         await update.message.reply_text("❌ Note save မအောင်မြင်ပါ")
@@ -173,11 +192,14 @@ async def cmd_note(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             ])
 
         header = "\n".join(lines)
-        await update.message.reply_text(
+        sent = await update.message.reply_text(
             header,
             reply_markup=InlineKeyboardMarkup(buttons),
             parse_mode="Markdown",
         )
+        # Auto-delete in groups
+        if update.effective_chat.type in ("group", "supergroup"):
+            asyncio.create_task(_auto_delete_message(ctx, update.effective_chat.id, sent.message_id))
     except Exception as e:
         logger.error("cmd_note error: %s", e)
         await update.message.reply_text("❌ Error ဖြစ်သွားတယ်")
@@ -215,27 +237,104 @@ async def cmd_mynote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 )
             ])
 
-        await update.message.reply_text(
+        sent = await update.message.reply_text(
             "\n".join(lines),
             reply_markup=InlineKeyboardMarkup(buttons) if buttons else None,
             parse_mode="Markdown",
         )
+        if update.effective_chat.type in ("group", "supergroup"):
+            asyncio.create_task(_auto_delete_message(ctx, update.effective_chat.id, sent.message_id))
     except Exception as e:
         logger.error("cmd_mynote error: %s", e)
         await update.message.reply_text("❌ Error ဖြစ်သွားတယ်")
 
 
-# ── /delnote မီဆိုဟင်းချို
+# ── /delnote  or  /delnote မီဆိုဟင်းချို
 async def cmd_delnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Delete notes for a book."""
+    """Delete notes - shows all user's notes to pick from."""
     try:
         book_title = " ".join(ctx.args).strip() if ctx.args else ""
+
+        user = update.effective_user
+        is_admin = _is_admin(update)
+
         if not book_title:
+            # No book specified - show all user's notes to pick
+            user_notes = get_user_notes(user.id)
+            if not user_notes:
+                await update.message.reply_text("📭 သင့် note မရှိသေးဘူး")
+                return
+
+            buttons = []
+            for n in user_notes[:10]:
+                stars = _stars(n["rating"])
+                label = f"❌ {n['book_title']} {stars} — {n['note_text'][:20]}..."
+                buttons.append([
+                    InlineKeyboardButton(label, callback_data=f"userdel|{n['id']}")
+                ])
             await update.message.reply_text(
-                "🗑️ Format: /delnote စာအုပ်နာမည်\n"
-                "ဥပမာ: /delnote မီဆိုဟင်းချို"
+                f"🗑️ ဖျက်ချင်တဲ့ note ကို နှိပ်ပါ:",
+                reply_markup=InlineKeyboardMarkup(buttons),
             )
             return
+
+        if is_admin:
+            # Admin sees all users' notes for that book
+            all_notes = get_notes_for_book(book_title)
+            if not all_notes:
+                await update.message.reply_text(f"📭 *{book_title}* အတွက် note မရှိဘူး", parse_mode="Markdown")
+                return
+
+            buttons = []
+            for n in all_notes:
+                stars = _stars(n["rating"])
+                username = n["username"] or "Anonymous"
+                buttons.append([
+                    InlineKeyboardButton(
+                        f"❌ {username} — {stars}",
+                        callback_data=f"admindel|{n['id']}|{book_title}"
+                    )
+                ])
+            buttons.append([
+                InlineKeyboardButton(
+                    f"🗑️ Delete All ({len(all_notes)})",
+                    callback_data=f"admin_delall|{book_title}"
+                )
+            ])
+            sent = await update.message.reply_text(
+                f"🗑️ *Admin Delete — {book_title}*\n\n"
+                f"ဖျက်ချင်တဲ့ note ကို နှိပ်ပါ:",
+                reply_markup=InlineKeyboardMarkup(buttons),
+                parse_mode="Markdown",
+            )
+        else:
+            # Regular user sees only their own notes
+            user_notes = [n for n in get_notes_for_book(book_title) if n["user_id"] == user.id]
+            if not user_notes:
+                await update.message.reply_text(
+                    f"📭 *{book_title}* အတွက် သင့် note မရှိဘူး",
+                    parse_mode="Markdown",
+                )
+                return
+
+            buttons = []
+            for n in user_notes:
+                stars = _stars(n["rating"])
+                buttons.append([
+                    InlineKeyboardButton(
+                        f"❌ {stars} — {n['note_text'][:30]}...",
+                        callback_data=f"userdel|{n['id']}"
+                    )
+                ])
+            sent = await update.message.reply_text(
+                f"🗑️ *{book_title}* — ဖျက်ချင်တဲ့ note ကို နှိပ်ပါ:",
+                reply_markup=InlineKeyboardMarkup(buttons),
+                parse_mode="Markdown",
+            )
+
+        # Auto-delete in groups
+        if update.effective_chat.type in ("group", "supergroup"):
+            asyncio.create_task(_auto_delete_message(ctx, update.effective_chat.id, sent.message_id))
 
         user = update.effective_user
         is_admin = _is_admin(update)
@@ -325,7 +424,9 @@ async def cmd_searchnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if len(notes) > 10:
             lines.append(f"... and {len(notes) - 10} more")
 
-        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+        sent = await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+        if update.effective_chat.type in ("group", "supergroup"):
+            asyncio.create_task(_auto_delete_message(ctx, update.effective_chat.id, sent.message_id))
     except Exception as e:
         logger.error("cmd_searchnote error: %s", e)
         await update.message.reply_text("❌ Error ဖြစ်သွားတယ်")
