@@ -106,7 +106,7 @@ async def handle_note_reply(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /note မီဆိုဟင်းချို
 async def cmd_note(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Show notes for a book."""
+    """Show notes for a book with numbered list."""
     try:
         book_title = " ".join(ctx.args).strip() if ctx.args else ""
         if not book_title:
@@ -125,33 +125,25 @@ async def cmd_note(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-        if len(notes) <= 3:
-            lines = [f"📝 *Notes for: {book_title}*\n"]
-            for n in notes:
-                stars = _stars(n["rating"])
-                username = n["username"] or "Anonymous"
-                lines.append(f"👤 {username} — {stars}")
-                lines.append(f'"{n["note_text"]}"\n')
-            await update.message.reply_text(
-                "\n".join(lines), parse_mode="Markdown"
-            )
-        else:
-            buttons = []
-            for i, n in enumerate(notes[:10]):
-                stars = _stars(n["rating"])
-                username = n["username"] or "Anonymous"
-                label = f"👤 {username} — {stars}"
-                buttons.append([InlineKeyboardButton(label, callback_data=f"noteview|{n['id']}")])
+        lines = [f"📝 *{book_title}* အတွက် Note {len(notes)} ခု\n"]
+        buttons = []
+        for i, n in enumerate(notes, 1):
+            stars = _stars(n["rating"])
+            username = n["username"] or "Anonymous"
+            lines.append(f"{i}. 👤 {username} — {stars}")
             buttons.append([
-                InlineKeyboardButton(f"📋 {len(notes)} notes total", callback_data="noop")
+                InlineKeyboardButton(
+                    f"{i}. {username} — {stars}",
+                    callback_data=f"noteview|{n['id']}"
+                )
             ])
-            markup = InlineKeyboardMarkup(buttons)
-            await update.message.reply_text(
-                f"📝 *Notes for: {book_title}*\n"
-                f"👆 နှိပ်ပြီး အသေးစိတ် ကြည့်ပါ",
-                reply_markup=markup,
-                parse_mode="Markdown",
-            )
+
+        header = "\n".join(lines)
+        await update.message.reply_text(
+            header,
+            reply_markup=InlineKeyboardMarkup(buttons),
+            parse_mode="Markdown",
+        )
     except Exception as e:
         logger.error("cmd_note error: %s", e)
         await update.message.reply_text("❌ Error ဖြစ်သွားတယ်")
