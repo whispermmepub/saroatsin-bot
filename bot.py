@@ -103,8 +103,11 @@ async def on_new_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if member.is_bot:
             continue
         name = member.first_name or member.username or "friend"
-        import random
         msg = random.choice(WELCOME_MSGS).format(name=name)
+        try:
+            await update.message.delete()
+        except Exception:
+            pass
         await update.message.reply_text(msg)
 
 
@@ -114,6 +117,10 @@ async def on_left_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if member.is_bot:
         return
     name = member.first_name or member.username or "friend"
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
     await update.message.reply_text(f"👋 {name} ထွက်သွားပါပြီ")
 
 
