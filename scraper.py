@@ -7,7 +7,8 @@ DATA_URL = "https://raw.githubusercontent.com/whispermmepub/wow-books/main/data.
 
 
 def fetch_books(url=DATA_URL):
-    """Fetch and parse all books from the JSON data source."""
+    """Fetch and parse all books from the JSON data source.
+    Returns (books_list, raw_data)."""
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     with urllib.request.urlopen(req, timeout=30) as resp:
         raw = json.loads(resp.read().decode("utf-8"))
@@ -21,7 +22,7 @@ def fetch_books(url=DATA_URL):
                 "title": book.get("title", ""),
                 "link": book.get("link", ""),
             })
-    return books
+    return books, raw
 
 
 def search_books(books, query):
