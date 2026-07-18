@@ -53,7 +53,7 @@ def add_note(user_id, username, book_title, rating, note_text):
 def get_notes_for_book(book_title):
     conn = _get_conn()
     rows = conn.execute(
-        "SELECT id, user_id, username, rating, note_text, created_at FROM notes WHERE book_title = ? AND deleted = 0 ORDER BY created_at DESC",
+        "SELECT id, user_id, username, rating, note_text, created_at FROM notes WHERE TRIM(LOWER(book_title)) = TRIM(LOWER(?)) AND deleted = 0 ORDER BY created_at DESC",
         (book_title,),
     ).fetchall()
     conn.close()
@@ -114,7 +114,7 @@ def get_notes_with_book_info():
     """Group notes by book_title for admin delete view."""
     conn = _get_conn()
     rows = conn.execute(
-        "SELECT id, user_id, username, book_title, rating, note_text FROM notes WHERE deleted = 0 ORDER BY book_title, created_at DESC"
+        "SELECT id, user_id, username, book_title, rating, note_text FROM notes WHERE deleted = 0 ORDER BY created_at DESC"
     ).fetchall()
     conn.close()
     books = {}

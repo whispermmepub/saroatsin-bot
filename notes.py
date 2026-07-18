@@ -28,23 +28,55 @@ def _is_admin(update):
     return user and user.username in ADMIN_USERNAMES
 
 
-# ── /addnote မီဆိုဟင်းချို - 5
+# ── /addnote မီဆိုဟင်းချို - 5  or  /addnote မီဆိုဟင်းချို - 5 - note text
 async def cmd_addnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Add a note: /addnote <book_title> - <rating>"""
+    """Add a note: /addnote <book_title> - <rating> [- note text]"""
     try:
         text = update.message.text.replace("/addnote", "", 1).strip()
         if not text:
             await update.message.reply_text(
                 "📝 Format: /addnote စာအုပ်နာမည် - rating\n"
-                "ဥပမာ: /addnote မီဆိုဟင်းချို - 5"
+                "ဥပမာ: /addnote မီဆိုဟင်းချို - 5\n"
+                "သို့: /addnote မီဆိုဟင်းချို - 5 - ဆရာသင့်လူ ဘာသာပြန်တာ ကောင်းတယ်"
+            )
+            return
+
+        # Support: /addnote book - rating - note text
+        # Split by " - " from right, but keep note text if 3 parts
+        parts = text.split(" - ")
+        if len(parts) >= 3:
+            book_title = parts[0].strip()
+            try:
+                rating = int(parts[1].strip())
+                rating = max(1, min(5, rating))
+            except ValueError:
+                await update.message.reply_text("❌ Rating 1-5 ထဲက ထည့်ပါ")
+                return
+            note_text = " - ".join(parts[2:]).strip()
+            # Save directly
+            user = update.effective_user
+            note_id = add_note(
+                user.id,
+                user.username or user.first_name or "Anonymous",
+                book_title, rating, note_text
+            )
+            stars = _stars(rating)
+            logger.info("Note saved directly: id=%d user=%s book=%s", note_id, user.username, book_title)
+            await update.message.reply_text(
+                f"✅ *Note saved!*\n\n"
+                f"📖 {book_title}\n"
+                f"Rating: {stars}\n"
+                f"📝 {note_text}\n\n"
+                f"🆔 Note #{note_id}",
+                parse_mode="Markdown",
             )
             return
 
         if " - " in text:
-            parts = text.rsplit(" - ", 1)
-            book_title = parts[0].strip()
+            parts2 = text.rsplit(" - ", 1)
+            book_title = parts2[0].strip()
             try:
-                rating = int(parts[1].strip())
+                rating = int(parts2[1].strip())
                 rating = max(1, min(5, rating))
             except ValueError:
                 await update.message.reply_text("❌ Rating 1-5 ထဲက ထည့်ပါ")
@@ -88,6 +120,7 @@ async def handle_note_reply(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return True
 
     try:
+        logger.info("Saving note: user=%s book=%s rating=%d", username, book_title, rating)
         note_id = add_note(user_id, username, book_title, rating, note_text)
         stars = _stars(rating)
         await update.message.reply_text(
@@ -116,6 +149,7 @@ async def cmd_note(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             )
             return
 
+        logger.info("Searching notes for book: '%s'", book_title)
         notes = get_notes_for_book(book_title)
         if not notes:
             await update.message.reply_text(
