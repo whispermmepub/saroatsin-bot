@@ -59,14 +59,19 @@ GOOD_NIGHT = "🌙 ညချမ်းပါ! စာအုပ်ကောင်�
 def load_books():
     global BOOKS, BOOKS_BY_AUTHOR, RAW_DATA
     logger.info("Fetching books from %s ...", DATA_URL)
-    books, raw = fetch_books(DATA_URL)
-    BOOKS = books
-    RAW_DATA = raw
-    logger.info("Loaded %d books from %d authors.", len(BOOKS), len({b["author"] for b in BOOKS}))
-    BOOKS_BY_AUTHOR = {}
-    for b in BOOKS:
-        key = b["author"].lower()
-        BOOKS_BY_AUTHOR.setdefault(key, []).append(b)
+    try:
+        books, raw = fetch_books(DATA_URL)
+        BOOKS = books
+        RAW_DATA = raw
+        logger.info("Loaded %d books from %d authors.", len(BOOKS), len({b["author"] for b in BOOKS}))
+        BOOKS_BY_AUTHOR = {}
+        for b in BOOKS:
+            key = b["author"].lower()
+            BOOKS_BY_AUTHOR.setdefault(key, []).append(b)
+    except Exception as e:
+        logger.error("Failed to load books: %s", e)
+        if not BOOKS:
+            logger.warning("No books loaded, using empty list")
 
 
 def push_to_github(data):
@@ -102,16 +107,20 @@ async def on_new_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Welcome new members."""
     if not update.message or not update.message.new_chat_members:
         return
-    try:
-        await update.message.delete()
-    except Exception as e:
-        logger.warning("Cannot delete service msg: %s", e)
+    chat_id = update.effective_chat.id
     for member in update.message.new_chat_members:
         if member.is_bot:
             continue
         name = member.first_name or member.username or "friend"
         msg = random.choice(WELCOME_MSGS).format(name=name)
-        await update.message.reply_text(msg)
+        try:
+            await update.message.delete()
+        except Exception as e:
+            logger.warning("Cannot delete service msg: %s", e)
+        try:
+            await ctx.bot.send_message(chat_id=chat_id, text=msg)
+        except Exception as e:
+            logger.error("Welcome msg failed for %s: %s", chat_id, e)
 
 
 async def on_left_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -122,11 +131,15 @@ async def on_left_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if member.is_bot:
         return
     name = member.first_name or member.username or "friend"
+    chat_id = update.effective_chat.id
     try:
         await update.message.delete()
     except Exception as e:
         logger.warning("Cannot delete service msg: %s", e)
-    await update.message.reply_text(f"👋 {name} ထွက်သွားပါပြီ")
+    try:
+        await ctx.bot.send_message(chat_id=chat_id, text=f"👋 {name} ထွက်သွားပါပြီ")
+    except Exception as e:
+        logger.error("Goodbye msg failed: %s", e)
 
 
 
@@ -251,8 +264,10 @@ async def track_group(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Track group chat IDs for scheduled messages."""
     if update.effective_chat.type in ("group", "supergroup"):
         chat_ids = ctx.bot_data.setdefault("group_chat_ids", [])
-        if update.effective_chat.id not in chat_ids:
-            chat_ids.append(update.effective_chat.id)
+        cid = update.effective_chat.id
+        if cid not in chat_ids:
+            chat_ids.append(cid)
+            logger.info("Tracked group %s for scheduled messages", cid)
 
 
 # ── Book Commands ────────────────────────────────────────
@@ -480,10 +495,12 @@ async def post_init(application: Application):
     BOT_USERNAME = me.username
     logger.info("Bot username: @%s", BOT_USERNAME)
 
-    # Schedule morning (7 AM) and night (9 PM) messages
+    # Schedule morning (7 AM Myanmar = 00:30 UTC) and night (9 PM Myanmar = 14:30 UTC)
+    from datetime import timezone, timedelta
+    MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
     job_queue = application.job_queue
-    job_queue.run_daily(good_morning, time=datetime.strptime("07:00", "%H:%M").time())
-    job_queue.run_daily(good_night, time=datetime.strptime("21:00", "%H:%M").time())
+    job_queue.run_daily(good_morning, time=datetime.strptime("07:00", "%H:%M").time(tz=MYANMAR_TZ))
+    job_queue.run_daily(good_night, time=datetime.strptime("21:00", "%H:%M").time(tz=MYANMAR_TZ))
 
     commands = [
         BotCommand("start", "စတင်ရန်"),
@@ -518,6 +535,9 @@ def main():
     )
 
     app.add_error_handler(error_handler)
+
+    # Track groups for scheduled messages (must be before other group handlers)
+    app.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, track_group, group=-1))
 
     # Book commands
     app.add_handler(CommandHandler("start", cmd_start))
