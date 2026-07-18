@@ -557,8 +557,8 @@ def main():
 
     # Track groups + search
     app.add_handler(CallbackQueryHandler(callback_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, spam_filter, group=1))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text, group=2))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, spam_filter), group=1)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text), group=2)
 
     logger.info("Bot is starting...")
     app.run_polling(drop_pending_updates=True)
