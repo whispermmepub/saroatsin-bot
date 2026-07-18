@@ -7,6 +7,7 @@ import base64
 import logging
 import asyncio
 import urllib.request
+from urllib.parse import urlparse
 from datetime import datetime
 from telegram import (
     Update,
@@ -114,6 +115,39 @@ async def on_left_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     name = member.first_name or member.username or "friend"
     await update.message.reply_text(f"👋 {name} ထွက်သွားပါပြီ")
+
+
+
+
+# ── Spam Protection ──────────────────────────────────────
+ALLOWED_DOMAINS = [
+    "facebook.com", "fb.com", "fb.watch",
+    "youtube.com", "youtu.be",
+    "twitter.com", "x.com",
+    "tiktok.com",
+]
+URL_RE = re.compile(r"https?://\S+")
+
+
+async def spam_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Auto-delete messages with non-allowed links in groups."""
+    chat = update.effective_chat
+    if chat.type not in ("group", "supergroup"):
+        return
+    text = (update.message.text or "") + " " + (update.message.caption or "")
+    urls = URL_RE.findall(text)
+    if not urls:
+        return
+    for url in urls:
+        host = (urlparse(url).hostname or "").lower()
+        if any(d in host for d in ALLOWED_DOMAINS):
+            continue
+        try:
+            await update.message.delete()
+            logger.info("Spam link deleted in %s: %s", chat.id, url)
+        except Exception as e:
+            logger.error("Failed to delete spam: %s", e)
+        return
 
 
 async def cmd_ban(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -489,6 +523,7 @@ def main():
 
     # Track groups + search
     app.add_handler(CallbackQueryHandler(callback_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, spam_filter))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
 
     logger.info("Bot is starting...")
