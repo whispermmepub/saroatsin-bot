@@ -99,28 +99,32 @@ def is_admin(update):
 # ── Group Management ─────────────────────────────────────
 async def on_new_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Welcome new members."""
+    if not update.message or not update.message.new_chat_members:
+        return
+    try:
+        await update.message.delete()
+    except Exception as e:
+        logger.warning("Cannot delete service msg: %s", e)
     for member in update.message.new_chat_members:
         if member.is_bot:
             continue
         name = member.first_name or member.username or "friend"
         msg = random.choice(WELCOME_MSGS).format(name=name)
-        try:
-            await update.message.delete()
-        except Exception:
-            pass
         await update.message.reply_text(msg)
 
 
 async def on_left_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Goodbye message."""
+    if not update.message or not update.message.left_chat_member:
+        return
     member = update.message.left_chat_member
     if member.is_bot:
         return
     name = member.first_name or member.username or "friend"
     try:
         await update.message.delete()
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Cannot delete service msg: %s", e)
     await update.message.reply_text(f"👋 {name} ထွက်သွားပါပြီ")
 
 
@@ -138,10 +142,12 @@ URL_RE = re.compile(r"https?://\S+")
 
 async def spam_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Auto-delete messages with non-allowed links in groups."""
+    if not update.message or not update.message.text:
+        return
     chat = update.effective_chat
     if chat.type not in ("group", "supergroup"):
         return
-    text = (update.message.text or "") + " " + (update.message.caption or "")
+    text = update.message.text or ""
     urls = URL_RE.findall(text)
     if not urls:
         return
@@ -149,9 +155,10 @@ async def spam_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         host = (urlparse(url).hostname or "").lower()
         if any(d in host for d in ALLOWED_DOMAINS):
             continue
+        logger.info("Spam detected in %s: %s", chat.id, url)
         try:
             await update.message.delete()
-            logger.info("Spam link deleted in %s: %s", chat.id, url)
+            logger.info("Spam deleted successfully")
         except Exception as e:
             logger.error("Failed to delete spam: %s", e)
         return
@@ -530,8 +537,8 @@ def main():
 
     # Track groups + search
     app.add_handler(CallbackQueryHandler(callback_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, spam_filter))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, spam_filter, group=1))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text, group=2))
 
     logger.info("Bot is starting...")
     app.run_polling(drop_pending_updates=True)
