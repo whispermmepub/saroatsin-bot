@@ -634,7 +634,7 @@ def main():
         app.add_handler(CommandHandler("mynote", cmd_mynote))
         app.add_handler(CommandHandler("delnote", cmd_delnote))
         app.add_handler(CommandHandler("searchnote", cmd_searchnote))
-        app.add_handler(CallbackQueryHandler(notes_callback))
+        app.add_handler(CallbackQueryHandler(notes_callback, pattern=r"^(noteview|userdel|admindel|admin_delall|noteclose|mynotedetail|noop)"))
 
     # Track groups + search
     app.add_handler(CallbackQueryHandler(callback_handler))
