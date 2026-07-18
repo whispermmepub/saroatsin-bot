@@ -398,7 +398,7 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def _do_search(update, ctx, query):
     if not BOOKS:
-        load_books()
+        return await update.message.reply_text("❌ စာအုပ်ဒေတာ မရှိသေးပါ။ /refresh ရိုက်ပါ")
     key = query.lower().strip()
     results = []
     if key in BOOKS_BY_AUTHOR:
@@ -537,7 +537,6 @@ def main():
     app.add_error_handler(error_handler)
 
     # Track groups for scheduled messages (must be before other group handlers)
-    app.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, track_group, group=-1))
 
     # Book commands
     app.add_handler(CommandHandler("start", cmd_start))
