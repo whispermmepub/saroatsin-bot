@@ -1,15 +1,30 @@
 <div align="center">
 
-# 📚 Saroatsin Bot
+<a href="https://t.me/wowepubsearch_bot">
+  <img src="https://img.shields.io/badge/📖-Saroatsin_Bot-2C3E50?style=for-the-badge&labelColor=1a1a2e&color=e94560" alt="Saroatsin Bot"/>
+</a>
 
-### စာအုပ်ရှာဖွေ Telegram Bot
+### 📚 မြန်မာစာအုပ်များ ရှာဖွေသည့် Telegram Bot
 
-[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Telegram](https://img.shields.io/badge/Telegram-Bot-26A5E4?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/wowepubsearch_bot)
-[![Railway](https://img.shields.io/badge/Railway-Deploy-9B59B6?style=for-the-badge&logo=railway&logoColor=white)](https://railway.app)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+<br/>
 
-[**🤖 Bot ကို စတင်အသုံးပြုရန်**](https://t.me/wowepubsearch_bot) → `@wowepubsearch_bot`
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![Railway](https://img.shields.io/badge/Railway-24_7 Hosting-9B59B6?style=flat-square&logo=railway&logoColor=white)](https://railway.app)
+[![Telegram](https://img.shields.io/badge/Telegram-Bot_API-26A5E4?style=flat-square&logo=telegram&logoColor=white)](https://core.telegram.org/bots)
+[![License](https://img.shields.io/badge/License-MIT-brightgreen?style=flat-square)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-🟢_Active-brightgreen?style=flat-square)](https://t.me/wowepubsearch_bot)
+
+<br/>
+
+<a href="https://t.me/wowepubsearch_bot">
+  <img src="https://img.shields.io/badge/🤖_Bot_ကို_စတင်အသုံးပြုရန်-Click_Here-blue?style=for-the-badge&logo=telegram&logoColor=white&color=0088cc" alt="Start Bot"/>
+</a>
+
+<br/>
+
+> *📖 စာရေးသူ သို့မဟုတ် စာအုပ်နာမည် ရိုက်ထည့်ပါ → စာအုပ်များ ပြန်လည်ပြပါမည်*
+
+---
 
 </div>
 
