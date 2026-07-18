@@ -447,9 +447,6 @@ async def _do_search(update, ctx, query):
         return
     page = 0
     text, markup = _results_page(results, query, page)
-    if markup:
-        close_btn = [InlineKeyboardButton("❌ ပိတ်ရန်", callback_data="searchclose")]
-        markup.inline_keyboard.append(close_btn)
     await update.message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
 
 
@@ -515,11 +512,6 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
         text, markup = _results_page(results, search_query, page)
         await query.edit_message_text(text, reply_markup=markup, parse_mode="Markdown")
-    elif parts[0] == "searchclose":
-        try:
-            await query.message.delete()
-        except Exception:
-            await query.edit_message_text("✅ ပိတ်ပြီးပါပြီ")
     elif parts[0] == "a" and len(parts) == 2:
         page = int(parts[1])
         authors = get_authors(BOOKS)
