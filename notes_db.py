@@ -171,6 +171,13 @@ def get_user_note_by_id(user_id, note_id):
             return n
     return None
 
+def get_note_by_id(note_id):
+    data = _ensure_data()
+    for n in data["notes"]:
+        if n["id"] == note_id and not n.get("deleted"):
+            return n
+    return None
+
 
 def delete_note(note_id, user_id=None):
     data = _ensure_data()

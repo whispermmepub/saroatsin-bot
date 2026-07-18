@@ -10,6 +10,7 @@ from notes_db import (
     get_notes_for_book,
     get_user_notes,
     get_user_note_by_id,
+    get_note_by_id,
     delete_note,
     delete_all_notes_for_book,
     search_notes,
@@ -428,16 +429,8 @@ async def notes_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # View individual note
     if parts[0] == "noteview" and len(parts) == 2:
         note_id = int(parts[1])
-        # Find the note across all users
-        from notes_db import _get_conn
-        conn = _get_conn()
-        row = conn.execute(
-            "SELECT id, user_id, username, book_title, rating, note_text, created_at FROM notes WHERE id = ? AND deleted = 0",
-            (note_id,),
-        ).fetchone()
-        conn.close()
-        if row:
-            r = dict(row)
+        r = get_note_by_id(note_id)
+        if r:
             stars = _stars(r["rating"])
             username = r["username"] or "Anonymous"
             await query.edit_message_text(
@@ -469,6 +462,13 @@ async def notes_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         book_title = parts[1]
         count = delete_all_notes_for_book(book_title)
         await query.edit_message_text(f"✅ *{book_title}* ရဲ့ note {count} ခု အကုန်ဖျက်ပြီးပါပြီ", parse_mode="Markdown")
+
+    # Close note message
+    elif parts[0] == "noteclose":
+        try:
+            await query.message.delete()
+        except Exception:
+            await query.edit_message_text("✅ ပိတ်ပြီးပါပြီ")
 
     # User's mynote detail
     elif parts[0] == "mynotedetail" and len(parts) >= 2:
