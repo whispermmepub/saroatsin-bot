@@ -152,7 +152,41 @@ ALLOWED_DOMAINS = [
     "tiktok.com",
     "blogspot.com", "whispermmepub.github.io", "saroatsin.com",
 ]
+
+ALLOWED_TG_CHANNELS = ["TheBookR", "refthebook"]
+
+BLOCKED_DOMAINS = [
+    "google.com", "google.co", "bit.ly", "tinyurl.com",
+    "t.me",
+    "pornhub.com", "xvideos.com", "xnxx.com", "xhamster.com",
+    "redtube.com", "youporn.com", "brazzers.com",
+]
+
 URL_RE = re.compile(r"https?://\S+")
+
+
+def is_url_allowed(url: str) -> bool:
+    """Check if a URL should be allowed (not spam)."""
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    path = parsed.path.lower()
+
+    # Allowed domains
+    if any(d in host for d in ALLOWED_DOMAINS):
+        return True
+
+    # Allowed Telegram channels
+    if host == "t.me":
+        for ch in ALLOWED_TG_CHANNELS:
+            if path.startswith("/" + ch.lower()) or path.startswith("/" + ch.lower() + "/"):
+                return True
+        return False
+
+    # Blocked domains
+    if any(d in host for d in BLOCKED_DOMAINS):
+        return False
+
+    return True
 
 
 async def spam_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -167,8 +201,7 @@ async def spam_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not urls:
         return
     for url in urls:
-        host = (urlparse(url).hostname or "").lower()
-        if any(d in host for d in ALLOWED_DOMAINS):
+        if is_url_allowed(url):
             continue
         logger.info("Spam detected in %s: %s", chat.id, url)
         try:
