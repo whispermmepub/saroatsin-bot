@@ -6,6 +6,7 @@ import re
 import json
 import base64
 import logging
+import asyncio
 import urllib.request
 from urllib.parse import urlparse
 from datetime import datetime
@@ -26,10 +27,6 @@ from telegram.ext import (
 )
 
 from scraper import fetch_books, search_books, get_authors
-from notes import (
-    cmd_addnote, cmd_note, cmd_mynote, cmd_delnote,
-    cmd_searchnote, notes_callback, handle_note_reply,
-)
 
 # ── Config ──────────────────────────────────────────────
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -38,7 +35,6 @@ GITHUB_REPO = "whispermmepub/wow-books"
 DATA_PATH = "data.json"
 RESULTS_PER_PAGE = 10
 ADMIN_USERNAMES = ["wowepub"]
-NOTES_ENABLED = True
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -378,26 +374,10 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not BOOKS:
         load_books()
     author_count = len({b["author"] for b in BOOKS})
-
-    # Note stats
-    note_count = 0
-    note_writers = set()
-    try:
-        from notes_db import _ensure_data
-        data = _ensure_data()
-        for n in data.get("notes", []):
-            if not n.get("deleted"):
-                note_count += 1
-                note_writers.add(n.get("user_id", 0))
-    except Exception:
-        pass
-
     await update.message.reply_text(
         f"📊 *Saroatsin Bot Stats*\n\n"
         f"📖 စာအုပ်: {len(BOOKS)}\n"
-        f"✍️ စာရေးသူ: {author_count}\n"
-        f"📑 Note စာရင်: {note_count}\n"
-        f"👷 Note ရေးသူ: {len(note_writers)}",
+        f"✍️ စာရေးသူ: {author_count}",
         parse_mode="Markdown",
     )
 
@@ -422,11 +402,6 @@ async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
-    # Handle pending note reply
-    if NOTES_ENABLED and "pending_note" in ctx.user_data:
-        handled = await handle_note_reply(update, ctx)
-        if handled:
-            return
     text = update.message.text.strip()
     is_group = update.effective_chat.type in ("group", "supergroup")
 
@@ -453,15 +428,12 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if not query:
         return
-    logger.info("Search query: %s (chat: %s, user: %s)", query, update.effective_chat.id, update.effective_user.id)
     await _do_search(update, ctx, query)
 
 
 async def _do_search(update, ctx, query):
-    logger.info("_do_search called: query=%s, BOOKS count=%d", query, len(BOOKS))
     if not BOOKS:
-        await update.message.reply_text("❌ စာအုပ်ဒေတာ မရှိသေးပါ။ /refresh ရိုက်ပါ")
-        return
+        return await update.message.reply_text("❌ စာအုပ်ဒေတာ မရှိသေးပါ။ /refresh ရိုက်ပါ")
     key = query.lower().strip()
     results = []
     if key in BOOKS_BY_AUTHOR:
@@ -475,9 +447,6 @@ async def _do_search(update, ctx, query):
         return
     page = 0
     text, markup = _results_page(results, query, page)
-    if markup:
-        close_btn = [InlineKeyboardButton("❌ ပိတ်ရန်", callback_data="searchclose")]
-        markup.inline_keyboard.append(close_btn)
     await update.message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
 
 
@@ -543,11 +512,6 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
         text, markup = _results_page(results, search_query, page)
         await query.edit_message_text(text, reply_markup=markup, parse_mode="Markdown")
-    elif parts[0] == "searchclose":
-        try:
-            await query.message.delete()
-        except Exception:
-            await query.edit_message_text("✅ ပိတ်ပြီးပါပြီ")
     elif parts[0] == "a" and len(parts) == 2:
         page = int(parts[1])
         authors = get_authors(BOOKS)
@@ -583,11 +547,6 @@ async def post_init(application: Application):
         BotCommand("setwelcome", "Welcome message ပြင်ရန်"),
         BotCommand("refresh", "ဒေတာပြန်ဖတ်ရန်"),
         BotCommand("stats", "စာရင်းဇယား"),
-        BotCommand("addnote", "Note ရေးရန်"),
-        BotCommand("note", "စာအုပ် Note ကြည့်ရန်"),
-        BotCommand("mynote", "ကိုယ့် Note များ"),
-        BotCommand("delnote", "Note ဖျက်ရန်"),
-        BotCommand("searchnote", "Note ရှာရန်"),
     ]
     await application.bot.set_my_commands(commands)
 
@@ -631,17 +590,6 @@ def main():
     # Group events
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_new_member))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, on_left_member))
-
-    # Notes commands
-    if NOTES_ENABLED:
-        from notes_db import init_db
-        init_db()
-        app.add_handler(CommandHandler("addnote", cmd_addnote))
-        app.add_handler(CommandHandler("note", cmd_note))
-        app.add_handler(CommandHandler("mynote", cmd_mynote))
-        app.add_handler(CommandHandler("delnote", cmd_delnote))
-        app.add_handler(CommandHandler("searchnote", cmd_searchnote))
-        app.add_handler(CallbackQueryHandler(notes_callback, pattern=r"^(noteview|userdel|admindel|admin_delall|noteclose|mynotedetail|noop)"))
 
     # Track groups + search
     app.add_handler(CallbackQueryHandler(callback_handler))
