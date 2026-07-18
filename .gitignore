@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 .env
+
+notes_data.json
+notes_data.sqlite3

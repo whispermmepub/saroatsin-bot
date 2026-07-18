@@ -1,125 +1,207 @@
-"""SQLite database handler for Book Notes."""
+"""Notes storage via GitHub (persistent across Railway deploys)."""
 
-import sqlite3
+import json
 import os
+import base64
+import urllib.request
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "notes_data.sqlite3")
+GITHUB_REPO = "whispermmepub/saroatsin-bot"
+NOTES_PATH = "notes_data.json"
+_data_cache = None
+_data_sha = None
+_last_load = 0
 
 
 def _get_conn():
-    conn = sqlite3.connect(DB_PATH, timeout=5)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """Compatibility stub - not used."""
+    pass
 
 
 def init_db():
-    conn = _get_conn()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS notes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            username TEXT,
-            book_title TEXT NOT NULL,
-            rating INTEGER DEFAULT 5,
-            note_text TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            deleted INTEGER DEFAULT 0
-        )
-    """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_user ON notes(user_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_book ON notes(book_title COLLATE NOCASE)")
-    conn.commit()
-    conn.close()
-    logger.info("Notes database initialized at %s", DB_PATH)
+    """Load notes from GitHub on startup."""
+    global _data_cache, _data_sha, _last_load
+    _data_cache = _load_from_github()
+    _last_load = time.time()
+    logger.info("Notes loaded from GitHub: %d notes", _count_notes())
+
+
+def _load_from_github():
+    """Fetch notes_data.json from GitHub."""
+    global _data_sha
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if not token:
+        logger.warning("No GITHUB_TOKEN - notes will not persist across deploys")
+        return {"notes": []}
+    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{NOTES_PATH}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    try:
+        req = urllib.request.Request(api_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            _data_sha = result.get("sha", "")
+            content = base64.b64decode(result["content"]).decode("utf-8")
+            return json.loads(content)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            logger.info("notes_data.json not found on GitHub, creating new one")
+            _data_sha = ""
+            return {"notes": []}
+        logger.error("Failed to load notes from GitHub: %s", e)
+        return {"notes": []}
+    except Exception as e:
+        logger.error("Failed to load notes from GitHub: %s", e)
+        return {"notes": []}
+
+
+def _save_to_github(data):
+    """Push notes_data.json to GitHub."""
+    global _data_sha
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if not token:
+        logger.warning("No GITHUB_TOKEN - notes not saved")
+        return False
+    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{NOTES_PATH}"
+    headers = {
+        "Authorization": f"token {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    # Get current SHA
+    try:
+        req = urllib.request.Request(api_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            _data_sha = result.get("sha", "")
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            _data_sha = ""
+        else:
+            logger.error("Failed to get SHA: %s", e)
+            return False
+    except Exception as e:
+        logger.error("Failed to get SHA: %s", e)
+        return False
+
+    content = json.dumps(data, ensure_ascii=False, indent=2)
+    payload = {
+        "message": "Update notes via Telegram bot",
+        "content": base64.b64encode(content.encode("utf-8")).decode("utf-8"),
+    }
+    if _data_sha:
+        payload["sha"] = _data_sha
+    req = urllib.request.Request(
+        api_url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="PUT",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            _data_sha = result.get("sha", "")
+            return True
+    except Exception as e:
+        logger.error("Failed to save notes to GitHub: %s", e)
+        return False
+
+
+def _count_notes():
+    if not _data_cache:
+        return 0
+    return len([n for n in _data_cache.get("notes", []) if not n.get("deleted")])
+
+
+def _ensure_data():
+    global _data_cache
+    if _data_cache is None:
+        _data_cache = {"notes": []}
+    return _data_cache
 
 
 def add_note(user_id, username, book_title, rating, note_text):
-    conn = _get_conn()
-    try:
-        conn.execute(
-            "INSERT INTO notes (user_id, username, book_title, rating, note_text) VALUES (?, ?, ?, ?, ?)",
-            (user_id, username, book_title, rating, note_text),
-        )
-        conn.commit()
-        note_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-        return note_id
-    finally:
-        conn.close()
+    data = _ensure_data()
+    note_id = max((n["id"] for n in data["notes"]), default=0) + 1
+    note = {
+        "id": note_id,
+        "user_id": user_id,
+        "username": username,
+        "book_title": book_title,
+        "rating": rating,
+        "note_text": note_text,
+        "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "deleted": False,
+    }
+    data["notes"].append(note)
+    _save_to_github(data)
+    return note_id
 
 
 def get_notes_for_book(book_title):
-    conn = _get_conn()
-    rows = conn.execute(
-        "SELECT id, user_id, username, rating, note_text, created_at FROM notes WHERE TRIM(LOWER(book_title)) = TRIM(LOWER(?)) AND deleted = 0 ORDER BY created_at DESC",
-        (book_title,),
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    data = _ensure_data()
+    return [
+        n for n in data["notes"]
+        if not n.get("deleted") and n["book_title"].strip().lower() == book_title.strip().lower()
+    ]
 
 
 def get_user_notes(user_id):
-    conn = _get_conn()
-    rows = conn.execute(
-        "SELECT id, book_title, rating, note_text, created_at FROM notes WHERE user_id = ? AND deleted = 0 ORDER BY created_at DESC",
-        (user_id,),
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    data = _ensure_data()
+    return [
+        n for n in data["notes"]
+        if not n.get("deleted") and n["user_id"] == user_id
+    ]
 
 
 def get_user_note_by_id(user_id, note_id):
-    conn = _get_conn()
-    row = conn.execute(
-        "SELECT id, user_id, username, book_title, rating, note_text, created_at FROM notes WHERE id = ? AND user_id = ? AND deleted = 0",
-        (note_id, user_id),
-    ).fetchone()
-    conn.close()
-    return dict(row) if row else None
+    data = _ensure_data()
+    for n in data["notes"]:
+        if n["id"] == note_id and n["user_id"] == user_id and not n.get("deleted"):
+            return n
+    return None
 
 
 def delete_note(note_id, user_id=None):
-    conn = _get_conn()
-    if user_id:
-        conn.execute("UPDATE notes SET deleted = 1 WHERE id = ? AND user_id = ?", (note_id, user_id))
-    else:
-        conn.execute("UPDATE notes SET deleted = 1 WHERE id = ?", (note_id,))
-    conn.commit()
-    conn.close()
+    data = _ensure_data()
+    for n in data["notes"]:
+        if n["id"] == note_id:
+            if user_id and n["user_id"] != user_id:
+                continue
+            n["deleted"] = True
+    _save_to_github(data)
 
 
 def delete_all_notes_for_book(book_title):
-    conn = _get_conn()
-    cursor = conn.execute("UPDATE notes SET deleted = 1 WHERE book_title = ? AND deleted = 0", (book_title,))
-    count = cursor.rowcount
-    conn.commit()
-    conn.close()
+    data = _ensure_data()
+    count = 0
+    for n in data["notes"]:
+        if not n.get("deleted") and n["book_title"].strip().lower() == book_title.strip().lower():
+            n["deleted"] = True
+            count += 1
+    _save_to_github(data)
     return count
 
 
 def search_notes(keyword):
-    conn = _get_conn()
-    like = f"%{keyword}%"
-    rows = conn.execute(
-        "SELECT id, user_id, username, book_title, rating, note_text, created_at FROM notes WHERE deleted = 0 AND (book_title LIKE ? OR note_text LIKE ?) ORDER BY created_at DESC",
-        (like, like),
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    data = _ensure_data()
+    kw = keyword.lower()
+    return [
+        n for n in data["notes"]
+        if not n.get("deleted")
+        and (kw in n["book_title"].lower() or kw in n["note_text"].lower())
+    ]
 
 
 def get_notes_with_book_info():
-    """Group notes by book_title for admin delete view."""
-    conn = _get_conn()
-    rows = conn.execute(
-        "SELECT id, user_id, username, book_title, rating, note_text FROM notes WHERE deleted = 0 ORDER BY created_at DESC"
-    ).fetchall()
-    conn.close()
+    data = _ensure_data()
     books = {}
-    for r in rows:
-        r = dict(r)
-        bt = r["book_title"]
-        books.setdefault(bt, []).append(r)
+    for n in data["notes"]:
+        if not n.get("deleted"):
+            bt = n["book_title"]
+            books.setdefault(bt, []).append(n)
     return books
