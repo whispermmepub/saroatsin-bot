@@ -47,22 +47,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ── Auto-delete helper ───────────────────────────────────
-import asyncio
-
-AUTO_DELETE_SECONDS = 40
-
-async def _auto_del(ctx, chat_id, message_id, delay=AUTO_DELETE_SECONDS):
-    """Auto-delete a message after delay seconds (groups only)."""
-    try:
-        await asyncio.sleep(delay)
-        await ctx.bot.delete_message(chat_id=chat_id, message_id=message_id)
-    except Exception:
-        pass
-
-def _is_group(update):
-    return update.effective_chat.type in ("group", "supergroup")
-
 # ── Globals ─────────────────────────────────────────────
 BOOKS = []
 BOOKS_BY_AUTHOR = {}
@@ -444,11 +428,10 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
         query = text[match.end():].strip()
         if not query:
-            sent = await update.message.reply_text(
+            await update.message.reply_text(
                 "စာရေးသူ နာမည် (သို့) စာအုပ်နာမည် ထည့်ပါ\n"
                 f"ဥပမာ - @{BOT_USERNAME} ဇဏ်ခီ"
             )
-            asyncio.create_task(_auto_del(ctx, update.effective_chat.id, sent.message_id))
             return
     else:
         query = text
@@ -460,9 +443,7 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def _do_search(update, ctx, query):
     if not BOOKS:
-        sent = await update.message.reply_text("❌ စာအုပ်ဒေတာ မရှိသေးပါ။ /refresh ရိုက်ပါ")
-        if _is_group(update):
-            asyncio.create_task(_auto_del(ctx, update.effective_chat.id, sent.message_id))
+        await update.message.reply_text("❌ စာအုပ်ဒေတာ မရှိသေးပါ။ /refresh ရိုက်ပါ")
         return
     key = query.lower().strip()
     results = []
@@ -471,17 +452,16 @@ async def _do_search(update, ctx, query):
     else:
         results = search_books(BOOKS, query)
     if not results:
-        sent = await update.message.reply_text(
+        await update.message.reply_text(
             f"❌ \"{query}\" နှင့် ကိုက်ညီသော စာအုပ် မတွေ့ပါ။"
         )
-        if _is_group(update):
-            asyncio.create_task(_auto_del(ctx, update.effective_chat.id, sent.message_id))
         return
     page = 0
     text, markup = _results_page(results, query, page)
-    sent = await update.message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
-    if _is_group(update):
-        asyncio.create_task(_auto_del(ctx, update.effective_chat.id, sent.message_id, delay=90))
+    if markup:
+        close_btn = [InlineKeyboardButton("❌ ပိတ်ရန်", callback_data="searchclose")]
+        markup.inline_keyboard.append(close_btn)
+    await update.message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
 
 
 def _results_page(results, query, page):
