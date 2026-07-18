@@ -379,10 +379,26 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not BOOKS:
         load_books()
     author_count = len({b["author"] for b in BOOKS})
+
+    # Note stats
+    note_count = 0
+    note_writers = set()
+    try:
+        from notes_db import _ensure_data
+        data = _ensure_data()
+        for n in data.get("notes", []):
+            if not n.get("deleted"):
+                note_count += 1
+                note_writers.add(n.get("user_id", 0))
+    except Exception:
+        pass
+
     await update.message.reply_text(
         f"📊 *Saroatsin Bot Stats*\n\n"
         f"📖 စာအုပ်: {len(BOOKS)}\n"
-        f"✍️ စာရေးသူ: {author_count}",
+        f"✍️ စာရေးသူ: {author_count}\n"
+        f"📑 Note စာရင်: {note_count}\n"
+        f"👷 Note ရေးသူ: {len(note_writers)}",
         parse_mode="Markdown",
     )
 
