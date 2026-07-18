@@ -27,6 +27,7 @@ from telegram.ext import (
 )
 
 from scraper import fetch_books, search_books, get_authors
+from notes import cmd_addnote, cmd_note, cmd_mynote, cmd_delnote
 
 # ── Config ──────────────────────────────────────────────
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -35,6 +36,7 @@ GITHUB_REPO = "whispermmepub/wow-books"
 DATA_PATH = "data.json"
 RESULTS_PER_PAGE = 10
 ADMIN_USERNAMES = ["wowepub"]
+NOTES_ENABLED = True
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -547,6 +549,10 @@ async def post_init(application: Application):
         BotCommand("setwelcome", "Welcome message ပြင်ရန်"),
         BotCommand("refresh", "ဒေတာပြန်ဖတ်ရန်"),
         BotCommand("stats", "စာရင်းဇယား"),
+        BotCommand("addnote", "Note ရေးရန်"),
+        BotCommand("note", "စာအုပ် Note ကြည့်ရန်"),
+        BotCommand("mynote", "ကိုယ့် Note များ"),
+        BotCommand("delnote", "Note ဖျက်ရန်"),
     ]
     await application.bot.set_my_commands(commands)
 
@@ -590,6 +596,15 @@ def main():
     # Group events
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_new_member))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, on_left_member))
+
+    # Notes commands
+    if NOTES_ENABLED:
+        from notes_db import init_db
+        init_db()
+        app.add_handler(CommandHandler("addnote", cmd_addnote))
+        app.add_handler(CommandHandler("note", cmd_note))
+        app.add_handler(CommandHandler("mynote", cmd_mynote))
+        app.add_handler(CommandHandler("delnote", cmd_delnote))
 
     # Track groups + search
     app.add_handler(CallbackQueryHandler(callback_handler))
