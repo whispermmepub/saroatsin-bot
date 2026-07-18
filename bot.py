@@ -150,6 +150,7 @@ ALLOWED_DOMAINS = [
     "youtube.com", "youtu.be",
     "twitter.com", "x.com",
     "tiktok.com",
+    "blogspot.com", "whispermmepub.github.io", "saroatsin.com",
 ]
 URL_RE = re.compile(r"https?://\S+")
 
