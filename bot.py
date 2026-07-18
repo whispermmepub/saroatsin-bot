@@ -496,11 +496,11 @@ async def post_init(application: Application):
     logger.info("Bot username: @%s", BOT_USERNAME)
 
     # Schedule morning (7 AM Myanmar = 00:30 UTC) and night (9 PM Myanmar = 14:30 UTC)
-    from datetime import timezone, timedelta
+    from datetime import timezone, timedelta, time as dt_time
     MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
     job_queue = application.job_queue
-    job_queue.run_daily(good_morning, time=datetime.strptime("07:00", "%H:%M").time(tz=MYANMAR_TZ))
-    job_queue.run_daily(good_night, time=datetime.strptime("21:00", "%H:%M").time(tz=MYANMAR_TZ))
+    job_queue.run_daily(good_morning, time=dt_time(hour=7, minute=0, tzinfo=MYANMAR_TZ))
+    job_queue.run_daily(good_night, time=dt_time(hour=21, minute=0, tzinfo=MYANMAR_TZ))
 
     commands = [
         BotCommand("start", "စတင်ရန်"),
@@ -536,7 +536,8 @@ def main():
 
     app.add_error_handler(error_handler)
 
-    # Track groups for scheduled messages (must be before other group handlers)
+    # Track groups for scheduled messages
+    app.add_handler(MessageHandler(filters.ALL, track_group), group=-1)
 
     # Book commands
     app.add_handler(CommandHandler("start", cmd_start))
