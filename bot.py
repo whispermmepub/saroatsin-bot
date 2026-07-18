@@ -6,7 +6,6 @@ import re
 import json
 import base64
 import logging
-import asyncio
 import urllib.request
 from urllib.parse import urlparse
 from datetime import datetime
