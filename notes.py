@@ -22,7 +22,7 @@ ADMIN_USERNAMES = ["wowepub"]
 
 _stars = lambda n: "⭐" * n + "☆" * (5 - n)
 
-AUTO_DELETE_SECONDS = 30
+AUTO_DELETE_SECONDS = 40
 
 async def _auto_delete_message(ctx, chat_id, message_id, delay=AUTO_DELETE_SECONDS):
     """Delete a message after delay seconds."""
