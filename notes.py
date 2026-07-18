@@ -22,16 +22,7 @@ ADMIN_USERNAMES = ["wowepub"]
 
 _stars = lambda n: "⭐" * n + "☆" * (5 - n)
 
-AUTO_DELETE_SECONDS = 40
 
-async def _auto_delete_message(ctx, chat_id, message_id, delay=AUTO_DELETE_SECONDS):
-    """Delete a message after delay seconds."""
-    try:
-        import asyncio
-        await asyncio.sleep(delay)
-        await ctx.bot.delete_message(chat_id=chat_id, message_id=message_id)
-    except Exception as e:
-        logger.debug("Auto-delete failed (msg may be deleted already): %s", e)
 
 
 def _is_admin(update):
@@ -81,10 +72,6 @@ async def cmd_addnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 f"🆔 Note #{note_id}",
                 parse_mode="Markdown",
             )
-            # Auto-delete in groups
-            if update.effective_chat.type in ("group", "supergroup"):
-                asyncio.create_task(_auto_delete_message(ctx, update.effective_chat.id, sent.message_id))
-                asyncio.create_task(_auto_delete_message(ctx, update.effective_chat.id, update.message.message_id))
             return
 
         if " - " in text:
@@ -146,10 +133,6 @@ async def handle_note_reply(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"🆔 Note #{note_id}",
             parse_mode="Markdown",
         )
-        # Auto-delete in groups
-        if update.effective_chat.type in ("group", "supergroup"):
-            asyncio.create_task(_auto_delete_message(ctx, update.effective_chat.id, sent.message_id))
-            asyncio.create_task(_auto_delete_message(ctx, update.effective_chat.id, update.message.message_id))
     except Exception as e:
         logger.error("add_note error: %s", e)
         await update.message.reply_text("❌ Note save မအောင်မြင်ပါ")
@@ -420,8 +403,6 @@ async def cmd_searchnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             lines.append(f"... and {len(notes) - 10} more")
 
         sent = await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
-        if update.effective_chat.type in ("group", "supergroup"):
-            asyncio.create_task(_auto_delete_message(ctx, update.effective_chat.id, sent.message_id))
     except Exception as e:
         logger.error("cmd_searchnote error: %s", e)
         await update.message.reply_text("❌ Error ဖြစ်သွားတယ်")
