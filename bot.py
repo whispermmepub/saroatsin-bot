@@ -27,6 +27,8 @@ from telegram.ext import (
 )
 
 from scraper import fetch_books, search_books, get_authors
+
+AUTO_DELETE_SECONDS = 30
 from notes import cmd_addnote, cmd_note, cmd_mynote, cmd_delnote, handle_note_reply, notes_callback
 
 # ── Config ──────────────────────────────────────────────
@@ -74,6 +76,14 @@ def load_books():
         logger.error("Failed to load books: %s", e)
         if not BOOKS:
             logger.warning("No books loaded, using empty list")
+
+
+async def schedule_delete(message, seconds=AUTO_DELETE_SECONDS):
+    await asyncio.sleep(seconds)
+    try:
+        await message.delete()
+    except Exception:
+        pass
 
 
 def push_to_github(data):
@@ -232,7 +242,8 @@ async def cmd_ban(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             await update.message.reply_text(f"❌ Ban မလုပ်နိုင်ပါ: {e}")
     else:
-        await update.message.reply_text("ban ချင်တဲ့ message ကို reply ပြီး /ban ရိုက်ပါ")
+        sent = await update.message.reply_text("ban ချင်တဲ့ message ကို reply ပြီး /ban ရိုက်ပါ")
+        asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_unban(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -256,7 +267,8 @@ async def cmd_unban(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         await update.message.reply_text(f"✅ {target} ကို unban ပြီးပါပြီ")
     except Exception as e:
-        await update.message.reply_text(f"❌ Unban မလုပ်နိုင်ပါ: {e}")
+        sent = await update.message.reply_text(f"❌ Unban မလုပ်နိုင်ပါ: {e}")
+        asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_setwelcome(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -273,7 +285,8 @@ async def cmd_setwelcome(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = " ".join(ctx.args)
     WELCOME_MSGS.clear()
     WELCOME_MSGS.append(msg)
-    await update.message.reply_text(f"✅ Welcome message ပြင်ပြီးပါပြီ:\n\n{msg}")
+    sent = await update.message.reply_text(f"✅ Welcome message ပြင်ပြီးပါပြီ:\n\n{msg}")
+    asyncio.create_task(schedule_delete(sent))
 
 
 # ── Scheduled Messages ──────────────────────────────────
@@ -324,7 +337,7 @@ async def auto_delete_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── Book Commands ────────────────────────────────────────
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
+    sent = await update.message.reply_text(
         "📖 *Saroatsin Bot*\n\n"
         "စာရေးသူ နာမည် (သို့) စာအုပ်နာမည် ရိုက်ထည့်ပါ\n\n"
         "📢 Group ထဲမှာ - @botusername စာရေးသူနာမည်\n\n"
@@ -337,6 +350,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/stats - စာရင်းဇယား",
         parse_mode="Markdown",
     )
+    asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -384,7 +398,8 @@ async def cmd_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text("❌ GitHub push မအောင်မြင်ပါ")
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+        sent = await update.message.reply_text(f"❌ Error: {e}")
+        asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -408,7 +423,8 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"📖 စာအုပ်: {len(BOOKS)}\n"
             f"✍️ စာရေးသူ: {author_count}"
         )
-    await update.message.reply_text(text, parse_mode="Markdown")
+    sent = await update.message.reply_text(text, parse_mode="Markdown")
+    asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_authors(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -417,12 +433,14 @@ async def cmd_authors(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     authors = get_authors(BOOKS)
     page = 0
     text, markup = _author_page(authors, page)
-    await update.message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
+    sent = await update.message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
+    asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not ctx.args:
-        await update.message.reply_text("အသုံးပြုပုံ - /search < keyword >")
+        sent = await update.message.reply_text("အသုံးပြုပုံ - /search < keyword >")
+        asyncio.create_task(schedule_delete(sent))
         return
     query = " ".join(ctx.args)
     await _do_search(update, ctx, query)
@@ -563,7 +581,8 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_refresh(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     load_books()
-    await update.message.reply_text(f"✅ {len(BOOKS)} စာအုပ် ပြန်လည်ဖတ်ရှုပြီးပါပြီ")
+    sent = await update.message.reply_text(f"✅ {len(BOOKS)} စာအုပ် ပြန်လည်ဖတ်ရှုပြီးပါပြီ")
+    asyncio.create_task(schedule_delete(sent))
 
 
 async def post_init(application: Application):
