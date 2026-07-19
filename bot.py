@@ -82,8 +82,9 @@ async def schedule_delete(message, seconds=AUTO_DELETE_SECONDS):
     await asyncio.sleep(seconds)
     try:
         await message.delete()
-    except Exception:
-        pass
+        logger.info("Auto-deleted message %s", message.message_id)
+    except Exception as e:
+        logger.warning("Failed to auto-delete message %s: %s", message.message_id, e)
 
 
 def push_to_github(data):
