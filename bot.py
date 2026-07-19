@@ -307,6 +307,21 @@ async def track_group(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             logger.info("Tracked group %s for scheduled messages", cid)
 
 
+async def auto_delete_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Auto-delete command messages in groups after 5 seconds."""
+    if not update.message:
+        return
+    chat_type = update.effective_chat.type
+    if chat_type not in ("group", "supergroup"):
+        return
+    msg = update.message
+    await asyncio.sleep(5)
+    try:
+        await msg.delete()
+    except Exception:
+        pass
+
+
 # ── Book Commands ────────────────────────────────────────
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -596,6 +611,7 @@ def main():
 
     # Track groups for scheduled messages
     app.add_handler(MessageHandler(filters.ALL, track_group), group=-1)
+    app.add_handler(MessageHandler(filters.COMMAND, auto_delete_command), group=-1)
 
     # Book commands
     app.add_handler(CommandHandler("start", cmd_start))
