@@ -611,7 +611,7 @@ def main():
 
     # Track groups for scheduled messages
     app.add_handler(MessageHandler(filters.ALL, track_group), group=-1)
-    app.add_handler(MessageHandler(filters.COMMAND, auto_delete_command), group=-1)
+    app.add_handler(MessageHandler(filters.COMMAND, auto_delete_command), group=-2)
 
     # Book commands
     app.add_handler(CommandHandler("start", cmd_start))
