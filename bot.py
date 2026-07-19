@@ -27,7 +27,7 @@ from telegram.ext import (
 )
 
 from scraper import fetch_books, search_books, get_authors
-from notes import cmd_addnote, cmd_note, cmd_mynote, cmd_delnote
+from notes import cmd_addnote, cmd_note, cmd_mynote, cmd_delnote, handle_note_reply
 
 # ── Config ──────────────────────────────────────────────
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -404,6 +404,11 @@ async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
+    # Handle pending note reply
+    if NOTES_ENABLED and "pending_note" in ctx.user_data:
+        handled = await handle_note_reply(update, ctx)
+        if handled:
+            return
     text = update.message.text.strip()
     is_group = update.effective_chat.type in ("group", "supergroup")
 

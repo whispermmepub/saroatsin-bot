@@ -1,7 +1,6 @@
 """Book Notes commands - simple text-based, no callbacks needed."""
 
 import logging
-import re
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -13,14 +12,15 @@ _stars = lambda n: "⭐" * n + "☆" * (5 - n)
 
 
 async def cmd_addnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Add a note: /addnote book rating [note]"""
+    """Step 1: /addnote book - rating  (or /addnote book rating)
+    Bot replies asking for note text. User replies to save."""
     text = update.message.text.replace("/addnote", "", 1).strip()
     if not text:
         await update.message.reply_text(
             "📝 Format:\n"
+            "/addnote မီဆိုဟင်းချို - 5\n"
             "/addnote မီဆိုဟင်းချို 5\n"
-            "/addnote မီဆိုဟင်းချို 5 ကောင်းတယ်\n"
-            "/addnote မီဆိုဟင်းချို - 5 - ကောင်းတယ်"
+            "ပြီးရင် reply မှာ note စာထည့်ပါ"
         )
         return
 
@@ -33,9 +33,8 @@ async def cmd_addnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         except ValueError:
             await update.message.reply_text("❌ Rating 1-5 ထဲက ထည့်ပါ")
             return
-        note_text = " - ".join(parts_dash[2:]).strip() if len(parts_dash) > 2 else ""
     else:
-        # Space-separated: /addnote book 5 note
+        # Space-separated: /addnote book 5
         tokens = text.split()
         if len(tokens) < 2:
             await update.message.reply_text("❌ Format: /addnote စာအုပ် rating")
@@ -52,16 +51,40 @@ async def cmd_addnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ စာအုပ်နာမည် ထည့်ပါ")
             return
         rating = max(1, min(5, int(tokens[rating_idx])))
-        note_text = " ".join(tokens[rating_idx + 1:]).strip()
+
+    # Save pending state, wait for user reply
+    ctx.user_data["pending_note"] = {
+        "book_title": book_title,
+        "rating": rating,
+    }
+    stars = _stars(rating)
+    await update.message.reply_text(
+        f"📝 *{book_title}* အတွက် note content ကို reply ပြီးရေးပါ\n"
+        f"Rating: {stars}",
+        parse_mode="Markdown",
+    )
+
+
+async def handle_note_reply(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Step 2: Handle reply text to save note. Returns True if handled."""
+    if "pending_note" not in ctx.user_data:
+        return False
+
+    pending = ctx.user_data.pop("pending_note")
+    note_text = update.message.text.strip()
+    if not note_text:
+        await update.message.reply_text("❌ Note content ထည့်ပါ")
+        return True
 
     user = update.effective_user
+    book_title = pending["book_title"]
+    rating = pending["rating"]
     note_id = add_note(user.id, user.username or user.first_name, book_title, rating, note_text)
     stars = _stars(rating)
-    msg = f"✅ Note saved!\n📖 {book_title}\nRating: {stars}"
-    if note_text:
-        msg += f"\n📝 {note_text}"
-    msg += f"\n🆔 #{note_id}"
-    await update.message.reply_text(msg)
+    await update.message.reply_text(
+        f"✅ Note saved!\n📖 {book_title}\nRating: {stars}\n📝 {note_text}\n🆔 #{note_id}"
+    )
+    return True
 
 
 async def cmd_note(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
