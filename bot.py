@@ -481,7 +481,15 @@ async def _do_search(update, ctx, query):
         return
     page = 0
     text, markup = _results_page(results, query, page)
-    await update.message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
+    sent = await update.message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
+    # Auto-hide search results after 30 seconds
+    async def _auto_delete():
+        await asyncio.sleep(30)
+        try:
+            await sent.delete()
+        except Exception:
+            pass
+    asyncio.create_task(_auto_delete())
 
 
 def _results_page(results, query, page):
