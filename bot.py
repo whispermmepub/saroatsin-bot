@@ -330,7 +330,6 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/authors - စာရေးသူများ\n"
         "/search <keyword> - ရှာဖွေရန်\n"
         "/add စာရေးသူ - စာအုပ် - link - စာအုပ်အသစ်ထည့်\n"
-        "/del စာရေးသူ - စာအုပ် - link - စာအုပ်ဖျက်\n"
         "/ban - ban ရန် (reply)\n"
         "/unban @username - unban ရန်\n"
         "/setwelcome message - welcome message ပြင်\n"
@@ -388,3 +387,282 @@ async def cmd_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         asyncio.create_task(schedule_delete(sent))
 
 
+async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not BOOKS:
+        load_books()
+    author_count = len({b["author"] for b in BOOKS})
+    if NOTES_ENABLED:
+        from notes_db import count_notes, count_note_users
+        note_count = count_notes()
+        note_users = count_note_users()
+        text = (
+            f"📊 *Saroatsin Bot Stats*\n\n"
+            f"📖 စာအုပ်: {len(BOOKS)}\n"
+            f"✍️ စာရေးသူ: {author_count}\n"
+            f"📑 Note စာရင်: {note_count}\n"
+            f"👷 Note ရေးသူ: {note_users}"
+        )
+    else:
+        text = (
+            f"📊 *Saroatsin Bot Stats*\n\n"
+            f"📖 စာအုပ်: {len(BOOKS)}\n"
+            f"✍️ စာရေးသူ: {author_count}"
+        )
+    sent = await update.message.reply_text(text, parse_mode="Markdown")
+    asyncio.create_task(schedule_delete(sent))
+
+
+async def cmd_authors(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not BOOKS:
+        load_books()
+    authors = get_authors(BOOKS)
+    page = 0
+    text, markup = _author_page(authors, page)
+    sent = await update.message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
+    asyncio.create_task(schedule_delete(sent))
+
+
+async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not ctx.args:
+        sent = await update.message.reply_text("အသုံးပြုပုံ - /search < keyword >")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    query = " ".join(ctx.args)
+    await _do_search(update, ctx, query)
+
+
+async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+    # Handle pending note reply
+    if NOTES_ENABLED and "pending_note" in ctx.user_data:
+        handled = await handle_note_reply(update, ctx)
+        if handled:
+            return
+    text = update.message.text.strip()
+    is_group = update.effective_chat.type in ("group", "supergroup")
+
+    # Track group for scheduled messages
+    if is_group:
+        chat_ids = ctx.bot_data.setdefault("group_chat_ids", [])
+        if update.effective_chat.id not in chat_ids:
+            chat_ids.append(update.effective_chat.id)
+
+    if is_group:
+        mention_pattern = rf"@{re.escape(BOT_USERNAME)}\b\s*"
+        match = re.search(mention_pattern, text, re.IGNORECASE)
+        if not match:
+            return
+        query = text[match.end():].strip()
+        if not query:
+            await update.message.reply_text(
+                "စာရေးသူ နာမည် (သို့) စာအုပ်နာမည် ထည့်ပါ\n"
+                f"ဥပမာ - @{BOT_USERNAME} ဇဏ်ခီ"
+            )
+            return
+    else:
+        query = text
+
+    if not query:
+        return
+    await _do_search(update, ctx, query)
+
+
+async def _do_search(update, ctx, query):
+    if not BOOKS:
+        return await update.message.reply_text("❌ စာအုပ်ဒေတာ မရှိသေးပါ။ /refresh ရိုက်ပါ")
+    key = query.lower().strip()
+    results = []
+    if key in BOOKS_BY_AUTHOR:
+        results = BOOKS_BY_AUTHOR[key]
+    else:
+        results = search_books(BOOKS, query)
+    if not results:
+        await update.message.reply_text(
+            f"❌ \"{query}\" နှင့် ကိုက်ညီသော စာအုပ် မတွေ့ပါ။"
+        )
+        return
+    page = 0
+    text, markup = _results_page(results, query, page)
+    sent = await update.message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
+    # Auto-hide search results after 30 seconds
+    async def _auto_delete():
+        await asyncio.sleep(30)
+        try:
+            await sent.delete()
+        except Exception:
+            pass
+    asyncio.create_task(_auto_delete())
+
+
+def _results_page(results, query, page):
+    total = len(results)
+    start = page * RESULTS_PER_PAGE
+    end = min(start + RESULTS_PER_PAGE, total)
+    page_items = results[start:end]
+    total_pages = (total + RESULTS_PER_PAGE - 1) // RESULTS_PER_PAGE
+    lines = [f"🔍 *{query}* — {total} စာအုပ်တွေ့ပါသည်\n"]
+    for i, b in enumerate(page_items, start=start + 1):
+        lines.append(f"{i}. {b['title']}")
+    text = "\n".join(lines)
+    buttons = []
+    for b in page_items:
+        buttons.append([InlineKeyboardButton(f"📖 {b['title'][:30]}", url=b["link"])])
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("◀️", callback_data=f"r|{query}|{page - 1}"))
+    if page < total_pages - 1:
+        nav.append(InlineKeyboardButton("▶️", callback_data=f"r|{query}|{page + 1}"))
+    if nav:
+        buttons.append(nav)
+    markup = InlineKeyboardMarkup(buttons) if buttons else None
+    return text, markup
+
+
+def _author_page(authors, page):
+    total = len(authors)
+    start = page * RESULTS_PER_PAGE
+    end = min(start + RESULTS_PER_PAGE, total)
+    page_items = authors[start:end]
+    total_pages = (total + RESULTS_PER_PAGE - 1) // RESULTS_PER_PAGE
+    lines = [f"✍️ *စာရေးသူများ* — {total} ဦး\n"]
+    for name, count in page_items:
+        lines.append(f"• {name} ({count})")
+    text = "\n".join(lines)
+    buttons = []
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("◀️", callback_data=f"a|{page - 1}"))
+    if page < total_pages - 1:
+        nav.append(InlineKeyboardButton("▶️", callback_data=f"a|{page + 1}"))
+    if nav:
+        buttons.append(nav)
+    markup = InlineKeyboardMarkup(buttons) if buttons else None
+    return text, markup
+
+
+async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    if not data:
+        return
+    parts = data.split("|", 2)
+    if parts[0] == "r" and len(parts) == 3:
+        search_query = parts[1]
+        page = int(parts[2])
+        results = search_books(BOOKS, search_query)
+        if not results:
+            await query.edit_message_text("ဒေတာ ပြန်လည်ရှာဖွေနေပါသည်...")
+            return
+        text, markup = _results_page(results, search_query, page)
+        await query.edit_message_text(text, reply_markup=markup, parse_mode="Markdown")
+    elif parts[0] == "a" and len(parts) == 2:
+        page = int(parts[1])
+        authors = get_authors(BOOKS)
+        text, markup = _author_page(authors, page)
+        await query.edit_message_text(text, reply_markup=markup, parse_mode="Markdown")
+
+
+async def cmd_refresh(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    load_books()
+    sent = await update.message.reply_text(f"✅ {len(BOOKS)} စာအုပ် ပြန်လည်ဖတ်ရှုပြီးပါပြီ")
+    asyncio.create_task(schedule_delete(sent))
+
+
+async def post_init(application: Application):
+    global BOT_USERNAME
+    me = await application.bot.get_me()
+    BOT_USERNAME = me.username
+    logger.info("Bot username: @%s", BOT_USERNAME)
+
+    # Schedule morning (7 AM Myanmar = 00:30 UTC) and night (9 PM Myanmar = 14:30 UTC)
+    from datetime import timezone, timedelta, time as dt_time
+    MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
+    job_queue = application.job_queue
+    job_queue.run_daily(good_morning, time=dt_time(hour=7, minute=0, tzinfo=MYANMAR_TZ))
+    job_queue.run_daily(good_night, time=dt_time(hour=21, minute=0, tzinfo=MYANMAR_TZ))
+
+    commands = [
+        BotCommand("start", "စတင်ရန်"),
+        BotCommand("authors", "စာရေးသူများ"),
+        BotCommand("search", "စာအုပ်ရှာရန်"),
+        BotCommand("add", "စာအုပ်အသစ်ထည့်ရန်"),
+        BotCommand("ban", "Ban ရန်"),
+        BotCommand("unban", "Unban ရန်"),
+        BotCommand("setwelcome", "Welcome message ပြင်ရန်"),
+        BotCommand("refresh", "ဒေတာပြန်ဖတ်ရန်"),
+        BotCommand("stats", "စာရင်းဇယား"),
+        BotCommand("addnote", "Note ရေးရန်"),
+        BotCommand("note", "စာအုပ် Note ကြည့်ရန်"),
+        BotCommand("mynote", "ကိုယ့် Note များ"),
+        BotCommand("delnote", "Note ဖျက်ရန်"),
+    ]
+    await application.bot.set_my_commands(commands)
+
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    logger.error("Exception while handling an update:", exc_info=context.error)
+
+
+def main():
+    if not BOT_TOKEN:
+        logger.error("TELEGRAM_BOT_TOKEN environment variable not set!")
+        return
+
+    load_books()
+
+    app = (
+        Application.builder()
+        .token(BOT_TOKEN)
+        .post_init(post_init)
+        .build()
+    )
+
+    app.add_error_handler(error_handler)
+
+    # Track groups for scheduled messages
+    app.add_handler(MessageHandler(filters.ALL, track_group), group=-1)
+
+
+    # Book commands
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("authors", cmd_authors))
+    app.add_handler(CommandHandler("search", cmd_search))
+    app.add_handler(CommandHandler("add", cmd_add))
+    app.add_handler(CommandHandler("refresh", cmd_refresh))
+    app.add_handler(CommandHandler("stats", cmd_stats))
+
+    # Group management commands
+    app.add_handler(CommandHandler("ban", cmd_ban))
+    app.add_handler(CommandHandler("unban", cmd_unban))
+    app.add_handler(CommandHandler("setwelcome", cmd_setwelcome))
+
+    # Group events
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_new_member))
+    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, on_left_member))
+
+    # Notes commands
+    if NOTES_ENABLED:
+        from notes_db import init_db
+        init_db()
+        app.add_handler(CommandHandler("addnote", cmd_addnote))
+        app.add_handler(CommandHandler("note", cmd_note))
+        app.add_handler(CommandHandler("mynote", cmd_mynote))
+        app.add_handler(CommandHandler("delnote", cmd_delnote))
+
+    # Notes callback (with pattern filter to avoid catching search callbacks)
+    if NOTES_ENABLED:
+        app.add_handler(CallbackQueryHandler(notes_callback, pattern=r"^note"))
+
+    # Search + author callbacks (with pattern filter)
+    app.add_handler(CallbackQueryHandler(callback_handler, pattern=r"^(r\||a\|)"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, spam_filter), group=1)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text), group=2)
+
+    logger.info("Bot is starting...")
+    app.run_polling(drop_pending_updates=True)
+
+
+if __name__ == "__main__":
+    main()
