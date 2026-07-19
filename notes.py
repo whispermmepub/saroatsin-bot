@@ -1,6 +1,7 @@
 """Book Notes commands - simple text-based, no callbacks needed."""
 
 import logging
+import re
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -12,25 +13,47 @@ _stars = lambda n: "⭐" * n + "☆" * (5 - n)
 
 
 async def cmd_addnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Add a note: /addnote book - rating - note text"""
+    """Add a note: /addnote book rating [note]"""
     text = update.message.text.replace("/addnote", "", 1).strip()
     if not text:
         await update.message.reply_text(
-            "📝 Format: /addnote စာအုပ်နာမည် - rating - note\n"
-            "ဥပမာ: /addnote မီဆိုဟင်းချို - 5 - ကောင်းတယ်"
+            "📝 Format:\n"
+            "/addnote မီဆိုဟင်းချို 5\n"
+            "/addnote မီဆိုဟင်းချို 5 ကောင်းတယ်\n"
+            "/addnote မီဆိုဟင်းချို - 5 - ကောင်းတယ်"
         )
         return
-    parts = text.split(" - ")
-    if len(parts) < 2:
-        await update.message.reply_text("❌ Format: /addnote စာအုပ် - rating - note")
-        return
-    book_title = parts[0].strip()
-    try:
-        rating = max(1, min(5, int(parts[1].strip())))
-    except ValueError:
-        await update.message.reply_text("❌ Rating 1-5 ထဲက ထည့်ပါ")
-        return
-    note_text = " - ".join(parts[2:]).strip() if len(parts) > 2 else ""
+
+    # Try " - " separator first
+    parts_dash = text.split(" - ")
+    if len(parts_dash) >= 2:
+        book_title = parts_dash[0].strip()
+        try:
+            rating = max(1, min(5, int(parts_dash[1].strip())))
+        except ValueError:
+            await update.message.reply_text("❌ Rating 1-5 ထဲက ထည့်ပါ")
+            return
+        note_text = " - ".join(parts_dash[2:]).strip() if len(parts_dash) > 2 else ""
+    else:
+        # Space-separated: /addnote book 5 note
+        tokens = text.split()
+        if len(tokens) < 2:
+            await update.message.reply_text("❌ Format: /addnote စာအုပ် rating")
+            return
+        rating_idx = None
+        for i, t in enumerate(tokens):
+            if t.isdigit() and 1 <= int(t) <= 5:
+                rating_idx = i
+        if rating_idx is None:
+            await update.message.reply_text("❌ Rating 1-5 ထဲက ထည့်ပါ")
+            return
+        book_title = " ".join(tokens[:rating_idx]).strip()
+        if not book_title:
+            await update.message.reply_text("❌ စာအုပ်နာမည် ထည့်ပါ")
+            return
+        rating = max(1, min(5, int(tokens[rating_idx])))
+        note_text = " ".join(tokens[rating_idx + 1:]).strip()
+
     user = update.effective_user
     note_id = add_note(user.id, user.username or user.first_name, book_title, rating, note_text)
     stars = _stars(rating)
