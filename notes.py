@@ -12,8 +12,6 @@ _stars = lambda n: "⭐" * n + "☆" * (5 - n)
 
 
 async def cmd_addnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Step 1: /addnote book - rating  (or /addnote book rating)
-    Bot replies asking for note text. User replies to save."""
     text = update.message.text.replace("/addnote", "", 1).strip()
     if not text:
         await update.message.reply_text(
@@ -63,7 +61,6 @@ async def cmd_addnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_note_reply(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Step 2: Handle reply text to save note. Returns True if handled."""
     if "pending_note" not in ctx.user_data:
         return False
 
@@ -85,7 +82,6 @@ async def handle_note_reply(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_note(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Show notes for a book: /note book_title"""
     if not ctx.args:
         await update.message.reply_text("🔍 Format: /note စာအုပ်နာမည်")
         return
@@ -99,8 +95,12 @@ async def cmd_note(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         n = notes[0]
         username = n.get("username", "Anonymous")
         stars = _stars(n["rating"])
-        msg = f"📖 *{book_title}*\n\n👤 {username} {stars}\n\n{n['note_text']}"
-        await update.message.reply_text(msg, parse_mode="Markdown")
+        close_btn = [[InlineKeyboardButton("❌ ပိတ်ရန်", callback_data="noteclose")]]
+        await update.message.reply_text(
+            f"📖 *{book_title}*\n\n👤 {username} {stars}\n\n{n['note_text']}",
+            reply_markup=InlineKeyboardMarkup(close_btn),
+            parse_mode="Markdown",
+        )
     else:
         lines = [f"📖 *{book_title}* — {len(notes)} notes\n"]
         buttons = []
@@ -113,6 +113,7 @@ async def cmd_note(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 f"👤 {username} {stars}",
                 callback_data=f"noteview|{n['id']}"
             )])
+        buttons.append([InlineKeyboardButton("❌ ပိတ်ရန်", callback_data="noteclose")])
         await update.message.reply_text(
             "\n".join(lines),
             reply_markup=InlineKeyboardMarkup(buttons),
@@ -121,14 +122,21 @@ async def cmd_note(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def notes_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Handle note view callbacks. Pattern: ^noteview"""
     query = update.callback_query
     data = query.data
 
-    if not data or not data.startswith("noteview"):
+    if not data or not data.startswith("note"):
         return
 
     await query.answer()
+
+    if data == "noteclose":
+        try:
+            await query.message.delete()
+        except Exception:
+            await query.edit_message_text("✅ ပိတ်ပြီးပါပြီ")
+        return
+
     parts = data.split("|")
     if parts[0] == "noteview" and len(parts) == 2:
         note_id = int(parts[1])
@@ -136,10 +144,12 @@ async def notes_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if n:
             stars = _stars(n["rating"])
             username = n.get("username", "Anonymous")
+            close_btn = [[InlineKeyboardButton("❌ ပိတ်ရန်", callback_data="noteclose")]]
             await query.edit_message_text(
                 f"👤 {username} — {stars}\n\n"
                 f"📖 {n['book_title']}\n\n"
                 f"\"{n['note_text']}\"",
+                reply_markup=InlineKeyboardMarkup(close_btn),
                 parse_mode="Markdown",
             )
         else:
@@ -147,7 +157,6 @@ async def notes_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_mynote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Show user's own notes: /mynote"""
     user_id = update.effective_user.id
     notes = get_user_notes(user_id)
     if not notes:
@@ -163,7 +172,6 @@ async def cmd_mynote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_delnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Delete a note: /delnote note_id"""
     if not ctx.args:
         await update.message.reply_text("🗑️ Format: /delnote note_id\nID ကို /mynote မှာ ကြည့်ပါ")
         return

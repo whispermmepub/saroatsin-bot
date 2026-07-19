@@ -625,7 +625,7 @@ def main():
 
     # Notes callback (with pattern filter to avoid catching search callbacks)
     if NOTES_ENABLED:
-        app.add_handler(CallbackQueryHandler(notes_callback, pattern="^noteview"))
+        app.add_handler(CallbackQueryHandler(notes_callback, pattern=r"^note"))
 
     # Search + author callbacks (with pattern filter)
     app.add_handler(CallbackQueryHandler(callback_handler, pattern=r"^(r\||a\|)"))
