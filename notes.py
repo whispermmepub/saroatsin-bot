@@ -34,7 +34,6 @@ async def cmd_addnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Rating 1-5 ထဲက ထည့်ပါ")
             return
     else:
-        # Space-separated: /addnote book 5
         tokens = text.split()
         if len(tokens) < 2:
             await update.message.reply_text("❌ Format: /addnote စာအုပ် rating")
@@ -52,7 +51,6 @@ async def cmd_addnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
         rating = max(1, min(5, int(tokens[rating_idx])))
 
-    # Save pending state, wait for user reply
     ctx.user_data["pending_note"] = {
         "book_title": book_title,
         "rating": rating,
@@ -97,20 +95,25 @@ async def cmd_note(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not notes:
         await update.message.reply_text(f"📭 \"{book_title}\" အတွက် note မရှိသေးပါ")
         return
+
     if len(notes) == 1:
         n = notes[0]
         username = n.get("username", "Anonymous")
         stars = _stars(n["rating"])
-        msg = f"📖 *{book_title}*\n\n👤 {username} {stars}\n\n{n["note_text"]}"
+        msg = f"📖 *{book_title}*\n\n👤 {username} {stars}\n\n{n['note_text']}"
         await update.message.reply_text(msg, parse_mode="Markdown")
     else:
         lines = [f"📖 *{book_title}* — {len(notes)} notes\n"]
-        for n in notes:
+        for i, n in enumerate(notes, 1):
             username = n.get("username", "Anonymous")
             stars = _stars(n["rating"])
-            text_preview = n["note_text"][:80] + "..." if len(n["note_text"]) > 80 else n["note_text"]
-            lines.append(f"• {username} {stars} — {text_preview}")
-        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+            text_preview = n["note_text"][:60] + "..." if len(n["note_text"]) > 60 else n["note_text"]
+            lines.append(f"{i}. {username} {stars}\n   {text_preview}\n")
+            if len("\n".join(lines)) > 3800:
+                await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+                lines = []
+        if lines:
+            await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_mynote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
