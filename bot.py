@@ -376,12 +376,24 @@ async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not BOOKS:
         load_books()
     author_count = len({b["author"] for b in BOOKS})
-    await update.message.reply_text(
-        f"📊 *Saroatsin Bot Stats*\n\n"
-        f"📖 စာအုပ်: {len(BOOKS)}\n"
-        f"✍️ စာရေးသူ: {author_count}",
-        parse_mode="Markdown",
-    )
+    if NOTES_ENABLED:
+        from notes_db import count_notes, count_note_users
+        note_count = count_notes()
+        note_users = count_note_users()
+        text = (
+            f"📊 *Saroatsin Bot Stats*\n\n"
+            f"📖 စာအုပ်: {len(BOOKS)}\n"
+            f"✍️ စာရေးသူ: {author_count}\n"
+            f"📑 Note စာရင်: {note_count}\n"
+            f"👷 Note ရေးသူ: {note_users}"
+        )
+    else:
+        text = (
+            f"📊 *Saroatsin Bot Stats*\n\n"
+            f"📖 စာအုပ်: {len(BOOKS)}\n"
+            f"✍️ စာရေးသူ: {author_count}"
+        )
+    await update.message.reply_text(text, parse_mode="Markdown")
 
 
 async def cmd_authors(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
