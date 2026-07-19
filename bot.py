@@ -329,7 +329,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "📢 Group ထဲမှာ - @botusername စာရေးသူနာမည်\n\n"
         "/authors - စာရေးသူများ\n"
         "/search <keyword> - ရှာဖွေရန်\n"
-        "/add author|title|link - စာအုပ်အသစ်ထည့်\n"
+        "/add စာရေးသူ - စာအုပ် - link - စာအုပ်အသစ်ထည့်\n"
         "/ban - ban ရန် (reply)\n"
         "/unban @username - unban ရန်\n"
         "/setwelcome message - welcome message ပြင်\n"
@@ -346,14 +346,14 @@ async def cmd_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     if not ctx.args:
         await update.message.reply_text(
-            "အသုံးပြုပုံ - /add စာရေးသူ|စာအုပ်နာမည်|link\n\n"
-            "ဥပမာ - /add ဇဏ်ခီ|အသစ်စာအုပ်|https://t.me/TheBookR/999?single"
+            "အသုံးပြုပုံ - /add စာရေးသူ - စာအုပ်နာမည် - link\n\n"
+            "ဥပမာ - /add ဇဏ်ခီ - အသစ်စာအုပ် - https://t.me/TheBookR/999?single"
         )
         return
-    raw_input = " ".join(ctx.args)
-    parts = raw_input.split("|")
+    text = update.message.text.replace("/add", "", 1).strip()
+    parts = text.split(" - ")
     if len(parts) < 3:
-        await update.message.reply_text("❌ Format: /add စာရေးသူ|စာအုပ်|link")
+        await update.message.reply_text("❌ Format: /add စာရေးသူ - စာအုပ် - link")
         return
     author = parts[0].strip()
     title = parts[1].strip()
