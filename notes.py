@@ -163,12 +163,22 @@ async def cmd_mynote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("📭 သင့် note များ မရှိသေးပါ")
         return
     lines = ["📝 *Your Notes*\n"]
+    buttons = []
     for n in notes:
         stars = _stars(n["rating"])
         lines.append(f"📖 {n['book_title']} {stars}")
         if n["note_text"]:
             lines.append(f"   {n['note_text'][:50]}")
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+        buttons.append([InlineKeyboardButton(
+            f"📖 {n['book_title']} {stars}",
+            callback_data=f"noteview|{n['id']}"
+        )])
+    buttons.append([InlineKeyboardButton("❌ ပိတ်ရန်", callback_data="noteclose")])
+    await update.message.reply_text(
+        "\n".join(lines),
+        reply_markup=InlineKeyboardMarkup(buttons),
+        parse_mode="Markdown",
+    )
 
 
 async def cmd_delnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
