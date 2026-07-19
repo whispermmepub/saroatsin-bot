@@ -90,6 +90,9 @@ async def schedule_delete(message, seconds=AUTO_DELETE_SECONDS):
 def push_to_github(data):
     """Push updated data.json to GitHub."""
     token = os.environ.get("GITHUB_TOKEN", "")
+    if not token:
+        logger.error("GITHUB_TOKEN not set! Cannot push to GitHub.")
+        return False
     content = json.dumps(data, ensure_ascii=False, indent=2)
     api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{DATA_PATH}"
     headers = {
