@@ -27,7 +27,7 @@ from telegram.ext import (
 )
 
 from scraper import fetch_books, search_books, get_authors
-from notes import cmd_addnote, cmd_note, cmd_mynote, cmd_delnote, handle_note_reply
+from notes import cmd_addnote, cmd_note, cmd_mynote, cmd_delnote, handle_note_reply, notes_callback
 
 # ── Config ──────────────────────────────────────────────
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -623,8 +623,12 @@ def main():
         app.add_handler(CommandHandler("mynote", cmd_mynote))
         app.add_handler(CommandHandler("delnote", cmd_delnote))
 
-    # Track groups + search
-    app.add_handler(CallbackQueryHandler(callback_handler))
+    # Notes callback (with pattern filter to avoid catching search callbacks)
+    if NOTES_ENABLED:
+        app.add_handler(CallbackQueryHandler(notes_callback, pattern="^noteview"))
+
+    # Search + author callbacks (with pattern filter)
+    app.add_handler(CallbackQueryHandler(callback_handler, pattern=r"^(r\||a\|)"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, spam_filter), group=1)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text), group=2)
 

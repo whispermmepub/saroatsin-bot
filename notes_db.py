@@ -137,6 +137,15 @@ def delete_note(note_id, user_id=None):
     return False
 
 
+def get_note_by_id(note_id):
+    if _data_cache is None:
+        return None
+    for n in _data_cache.get("notes", []):
+        if n["id"] == note_id:
+            return n
+    return None
+
+
 def count_notes():
     if _data_cache is None:
         return 0

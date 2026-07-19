@@ -1,10 +1,10 @@
-"""Book Notes commands - simple text-based, no callbacks needed."""
+"""Book Notes commands - simple text-based with callback buttons for viewing."""
 
 import logging
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-from notes_db import add_note, get_notes_for_book, get_user_notes, delete_note
+from notes_db import add_note, get_notes_for_book, get_user_notes, delete_note, get_note_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,6 @@ async def cmd_addnote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Try " - " separator first
     parts_dash = text.split(" - ")
     if len(parts_dash) >= 2:
         book_title = parts_dash[0].strip()
@@ -104,16 +103,47 @@ async def cmd_note(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, parse_mode="Markdown")
     else:
         lines = [f"📖 *{book_title}* — {len(notes)} notes\n"]
-        for i, n in enumerate(notes, 1):
+        buttons = []
+        for n in notes:
             username = n.get("username", "Anonymous")
             stars = _stars(n["rating"])
-            text_preview = n["note_text"][:60] + "..." if len(n["note_text"]) > 60 else n["note_text"]
-            lines.append(f"{i}. {username} {stars}\n   {text_preview}\n")
-            if len("\n".join(lines)) > 3800:
-                await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
-                lines = []
-        if lines:
-            await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+            text_preview = n["note_text"][:40] + "..." if len(n["note_text"]) > 40 else n["note_text"]
+            lines.append(f"• {username} {stars} — {text_preview}")
+            buttons.append([InlineKeyboardButton(
+                f"👤 {username} {stars}",
+                callback_data=f"noteview|{n['id']}"
+            )])
+        await update.message.reply_text(
+            "\n".join(lines),
+            reply_markup=InlineKeyboardMarkup(buttons),
+            parse_mode="Markdown",
+        )
+
+
+async def notes_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Handle note view callbacks. Pattern: ^noteview"""
+    query = update.callback_query
+    data = query.data
+
+    if not data or not data.startswith("noteview"):
+        return
+
+    await query.answer()
+    parts = data.split("|")
+    if parts[0] == "noteview" and len(parts) == 2:
+        note_id = int(parts[1])
+        n = get_note_by_id(note_id)
+        if n:
+            stars = _stars(n["rating"])
+            username = n.get("username", "Anonymous")
+            await query.edit_message_text(
+                f"👤 {username} — {stars}\n\n"
+                f"📖 {n['book_title']}\n\n"
+                f"\"{n['note_text']}\"",
+                parse_mode="Markdown",
+            )
+        else:
+            await query.edit_message_text("❌ Note မတွေ့ပါ")
 
 
 async def cmd_mynote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
