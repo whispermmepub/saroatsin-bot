@@ -97,13 +97,20 @@ async def cmd_note(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not notes:
         await update.message.reply_text(f"📭 \"{book_title}\" အတွက် note မရှိသေးပါ")
         return
-    lines = [f"📖 *{book_title}* — {len(notes)} notes\n"]
-    for n in notes:
+    if len(notes) == 1:
+        n = notes[0]
         username = n.get("username", "Anonymous")
         stars = _stars(n["rating"])
-        text_preview = n["note_text"][:40] + "..." if len(n["note_text"]) > 40 else n["note_text"]
-        lines.append(f"• {username} {stars} — {text_preview}")
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+        msg = f"📖 *{book_title}*\n\n👤 {username} {stars}\n\n{n["note_text"]}"
+        await update.message.reply_text(msg, parse_mode="Markdown")
+    else:
+        lines = [f"📖 *{book_title}* — {len(notes)} notes\n"]
+        for n in notes:
+            username = n.get("username", "Anonymous")
+            stars = _stars(n["rating"])
+            text_preview = n["note_text"][:80] + "..." if len(n["note_text"]) > 80 else n["note_text"]
+            lines.append(f"• {username} {stars} — {text_preview}")
+        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_mynote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
