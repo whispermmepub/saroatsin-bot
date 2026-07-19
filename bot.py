@@ -387,6 +387,51 @@ async def cmd_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         asyncio.create_task(schedule_delete(sent))
 
 
+
+async def cmd_del(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Delete a book. Format: /del author - title - link"""
+    if not is_admin(update):
+        await update.message.reply_text("❌ Admin သာ ဖျက်ခွင့်ရှိပါတယ်")
+        return
+    text = update.message.text.replace("/del", "", 1).strip()
+    parts = text.split(" - ")
+    if len(parts) < 3:
+        await update.message.reply_text("❌ Format: /del စာရေးသူ - စာအုပ် - link")
+        return
+    author = parts[0].strip()
+    title = parts[1].strip()
+    link = parts[2].strip()
+    if not author or not title or not link:
+        await update.message.reply_text("❌ အကုန်ဖြည့်ပါ")
+        return
+    found = False
+    for entry in RAW_DATA:
+        if entry["author"].lower() == author.lower():
+            for i, book in enumerate(entry["books"]):
+                if book["title"].lower() == title.lower() and book["link"] == link:
+                    entry["books"].pop(i)
+                    found = True
+                    break
+            if not entry["books"]:
+                RAW_DATA.remove(entry)
+            break
+    if not found:
+        await update.message.reply_text("❌ " + title + " မတွေ့ပါ")
+        return
+    try:
+        success = push_to_github(RAW_DATA)
+        if success:
+            load_books()
+            msg = "✅ ဖျက်ပြီးပါပြီ!\n\n"
+            msg += "✍️ စာရေးသူ: " + author + "\n"
+            msg += "📖 စာအုပ်: " + title + "\n\n"
+            msg += "📊 စုစုပေါင်း " + str(len(BOOKS)) + " စာအုပ် ကျန်ပါတယ်"
+            await update.message.reply_text(msg)
+        else:
+            await update.message.reply_text("❌ GitHub push မအောင်မြင်ပါ")
+    except Exception as e:
+        sent = await update.message.reply_text("❌ Error: " + str(e))
+        asyncio.create_task(schedule_delete(sent))
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not BOOKS:
         load_books()
@@ -588,6 +633,7 @@ async def post_init(application: Application):
         BotCommand("authors", "စာရေးသူများ"),
         BotCommand("search", "စာအုပ်ရှာရန်"),
         BotCommand("add", "စာအုပ်အသစ်ထည့်ရန်"),
+        BotCommand("del", "စာအုပ်ဖျက်ရန်"),
         BotCommand("ban", "Ban ရန်"),
         BotCommand("unban", "Unban ရန်"),
         BotCommand("setwelcome", "Welcome message ပြင်ရန်"),
@@ -630,6 +676,7 @@ def main():
     app.add_handler(CommandHandler("authors", cmd_authors))
     app.add_handler(CommandHandler("search", cmd_search))
     app.add_handler(CommandHandler("add", cmd_add))
+    app.add_handler(CommandHandler("del", cmd_del))
     app.add_handler(CommandHandler("refresh", cmd_refresh))
     app.add_handler(CommandHandler("stats", cmd_stats))
 
