@@ -361,7 +361,6 @@ async def cmd_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not author or not title or not link:
         await update.message.reply_text("❌ အကုန်ဖြည့်ပါ")
         return
-    await update.message.reply_text("⏳ GitHub ထဲ ထည့်နေပါတယ်...")
     author_found = False
     for entry in RAW_DATA:
         if entry["author"].lower() == author.lower():
