@@ -78,6 +78,26 @@ def load_books():
             logger.warning("No books loaded, using empty list")
 
 
+def rebuild_books():
+    """Rebuild BOOKS and BOOKS_BY_AUTHOR from in-memory RAW_DATA (no CDN fetch)."""
+    global BOOKS, BOOKS_BY_AUTHOR
+    books = []
+    for author_entry in RAW_DATA:
+        author = author_entry.get("author", "")
+        for book in author_entry.get("books", []):
+            books.append({
+                "author": author,
+                "title": book.get("title", ""),
+                "link": book.get("link", ""),
+            })
+    BOOKS = books
+    BOOKS_BY_AUTHOR = {}
+    for b in BOOKS:
+        key = b["author"].lower()
+        BOOKS_BY_AUTHOR.setdefault(key, []).append(b)
+    logger.info("Rebuilt %d books from in-memory RAW_DATA.", len(BOOKS))
+
+
 async def schedule_delete(message, seconds=AUTO_DELETE_SECONDS):
     await asyncio.sleep(seconds)
     try:
@@ -87,7 +107,7 @@ async def schedule_delete(message, seconds=AUTO_DELETE_SECONDS):
         logger.warning("Failed to auto-delete message %s: %s", message.message_id, e)
 
 
-def push_to_github(data):
+def push_to_github(data, message="Update data.json via Telegram bot"):
     """Push updated data.json to GitHub."""
     token = os.environ.get("GITHUB_TOKEN", "")
     if not token:
@@ -103,8 +123,9 @@ def push_to_github(data):
     with urllib.request.urlopen(req, timeout=15) as resp:
         current = json.loads(resp.read().decode("utf-8"))
         sha = current["sha"]
+    logger.info("push_to_github: writing %d bytes, commit: %s", len(content), message)
     payload = json.dumps({
-        "message": "Add book via Telegram bot",
+        "message": message,
         "content": base64.b64encode(content.encode("utf-8")).decode("utf-8"),
         "sha": sha,
     }).encode("utf-8")
@@ -373,9 +394,9 @@ async def cmd_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not author_found:
         RAW_DATA.append({"author": author, "books": [{"title": title, "link": link}]})
     try:
-        success = push_to_github(RAW_DATA)
+        success = push_to_github(RAW_DATA, message=f"Add: {author} - {title}")
         if success:
-            load_books()
+            rebuild_books()
             await update.message.reply_text(
                 f"✅ ထည့်ပြီးပါပြီ!\n\n"
                 f"✍️ စာရေးသူ: {author}\n"
@@ -422,9 +443,9 @@ async def cmd_del(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ " + title + " မတွေ့ပါ")
         return
     try:
-        success = push_to_github(RAW_DATA)
+        success = push_to_github(RAW_DATA, message=f"Del: {author} - {title}")
         if success:
-            load_books()
+            rebuild_books()
             msg = "✅ ဖျက်ပြီးပါပြီ!\n\n"
             msg += "✍️ စာရေးသူ: " + author + "\n"
             msg += "📖 စာအုပ်: " + title + "\n\n"
