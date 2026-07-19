@@ -30,6 +30,7 @@ from scraper import fetch_books, search_books, get_authors
 
 AUTO_DELETE_SECONDS = 30
 from notes import cmd_addnote, cmd_note, cmd_mynote, cmd_delnote, handle_note_reply, notes_callback
+from spam_db import init_spam_db, add_spam_domain, remove_spam_domain, get_spam_domains
 
 # ── Config ──────────────────────────────────────────────
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -220,8 +221,13 @@ def is_url_allowed(url: str) -> bool:
                 return True
         return False
 
-    # Blocked domains
+    # Blocked domains (built-in)
     if any(d in host for d in BLOCKED_DOMAINS):
+        return False
+
+    # Custom blocked domains (from /addlink)
+    custom_blocked = get_spam_domains()
+    if any(d in host for d in custom_blocked):
         return False
 
     return True
@@ -311,6 +317,81 @@ async def cmd_setwelcome(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     WELCOME_MSGS.clear()
     WELCOME_MSGS.append(msg)
     sent = await update.message.reply_text(f"✅ Welcome message ပြင်ပြီးပါပြီ:\n\n{msg}")
+    asyncio.create_task(schedule_delete(sent))
+
+async def cmd_addlink(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        sent = await update.message.reply_text("❌ Admin သာ ထည့်ခွင့်ရှိပါတယ်")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    text = update.message.text.replace("/addlink", "", 1).strip()
+    parts = text.split(" - ")
+    if len(parts) < 2:
+        sent = await update.message.reply_text("Format: /addlink - www.example.com")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    domain = parts[1].strip().lower()
+    if not domain:
+        sent = await update.message.reply_text("❌ Domain ထည့်ပါ")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    if add_spam_domain(domain):
+        custom = get_spam_domains()
+        sent = await update.message.reply_text(
+            "✅ Blocked domain ထည့်ပြီးပါပြီ!\n\n"
+            "🚫 " + domain + "\n\n"
+            "📊 Custom blocked: " + str(len(custom)) + " ခု"
+        )
+    else:
+        sent = await update.message.reply_text("⚠️ " + domain + " ရှိပြီးသားပါ")
+    asyncio.create_task(schedule_delete(sent))
+
+
+async def cmd_dellink(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        sent = await update.message.reply_text("❌ Admin သာ ဖျက်ခွင့်ရှိပါတယ်")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    text = update.message.text.replace("/dellink", "", 1).strip()
+    parts = text.split(" - ")
+    if len(parts) < 2:
+        sent = await update.message.reply_text("Format: /dellink - www.example.com")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    domain = parts[1].strip().lower()
+    if not domain:
+        sent = await update.message.reply_text("❌ Domain ထည့်ပါ")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    if remove_spam_domain(domain):
+        custom = get_spam_domains()
+        sent = await update.message.reply_text(
+            "✅ Blocked domain ဖျက်ပြီးပါပြီ!\n\n"
+            "🔓 " + domain + "\n\n"
+            "📊 Custom blocked: " + str(len(custom)) + " ခု"
+        )
+    else:
+        sent = await update.message.reply_text("❌ " + domain + " မတွေ့ပါ")
+    asyncio.create_task(schedule_delete(sent))
+
+
+async def cmd_spamlist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        sent = await update.message.reply_text("❌ Admin သာ ကြည့်ခွင့်ရှိပါတယ်")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    custom = get_spam_domains()
+    lines = ["🚫 *Blocked Domains*\n"]
+    lines.append("*Built-in:*")
+    for d in BLOCKED_DOMAINS:
+        lines.append("• `" + d + "`")
+    if custom:
+        lines.append("\n*Custom (" + str(len(custom)) + "):*")
+        for d in custom:
+            lines.append("• `" + d + "`")
+    else:
+        lines.append("\nCustom: မရှိသေးပါ")
+    sent = await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
     asyncio.create_task(schedule_delete(sent))
 
 
@@ -667,6 +748,9 @@ async def post_init(application: Application):
         BotCommand("note", "စာအုပ် Note ကြည့်ရန်"),
         BotCommand("mynote", "ကိုယ့် Note များ"),
         BotCommand("delnote", "Note ဖျက်ရန်"),
+        BotCommand("addlink", "Spam domain ထည့်ရန်"),
+        BotCommand("dellink", "Spam domain ဖျက်ရန်"),
+        BotCommand("spamlist", "Blocked domains ကြည့်ရန်"),
     ]
     await application.bot.set_my_commands(commands)
 
@@ -681,6 +765,7 @@ def main():
         return
 
     load_books()
+    init_spam_db()
 
     app = (
         Application.builder()
@@ -712,6 +797,11 @@ def main():
     # Group events
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_new_member))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, on_left_member))
+
+    # Spam link management
+    app.add_handler(CommandHandler("addlink", cmd_addlink))
+    app.add_handler(CommandHandler("dellink", cmd_dellink))
+    app.add_handler(CommandHandler("spamlist", cmd_spamlist))
 
     # Notes commands
     if NOTES_ENABLED:
