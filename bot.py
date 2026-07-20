@@ -210,14 +210,8 @@ async def on_new_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             ents = []
         try:
             await update.message.delete()
-        except Exception as e:
-            logger.warning("Cannot delete service msg: %s", e)
-        old_msg_id = ctx.bot_data.get("last_welcome_msg", {}).get(chat_id)
-        if old_msg_id:
-            try:
-                await ctx.bot.delete_message(chat_id=chat_id, message_id=old_msg_id)
-            except Exception:
-                pass
+        except Exception:
+            pass
         try:
             has_custom = any(e.type == "custom_emoji" for e in ents)
             if has_custom:
@@ -226,7 +220,6 @@ async def on_new_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
             else:
                 sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg)
-            ctx.bot_data.setdefault("last_welcome_msg", {})[chat_id] = sent_msg.message_id
             logger.info("Welcome sent to %s for %s", chat_id, name)
         except Exception as e:
             logger.error("Welcome msg failed for %s: %s", chat_id, e)
@@ -243,25 +236,19 @@ async def on_left_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     try:
         await update.message.delete()
-    except Exception as e:
-        logger.warning("Cannot delete service msg: %s", e)
+    except Exception:
+        pass
     try:
         mention = '<a href="tg://user?id={}">{}</a>'.format(member.id, name)
         msg, ents = _build_message(GOODBYE_MSG, name, mention, GOODBYE_ENTITIES)
-        old_msg_id = ctx.bot_data.get("last_goodbye_msg", {}).get(chat_id)
-        if old_msg_id:
-            try:
-                await ctx.bot.delete_message(chat_id=chat_id, message_id=old_msg_id)
-            except Exception:
-                pass
         has_custom = any(e.type == "custom_emoji" for e in ents)
         if has_custom:
-            sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg, entities=ents)
+            await ctx.bot.send_message(chat_id=chat_id, text=msg, entities=ents)
         elif "{mention}" in GOODBYE_MSG:
-            sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
+            await ctx.bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
         else:
-            sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg)
-        ctx.bot_data.setdefault("last_goodbye_msg", {})[chat_id] = sent_msg.message_id
+            await ctx.bot.send_message(chat_id=chat_id, text=msg)
+        logger.info("Goodbye sent to %s for %s", chat_id, name)
     except Exception as e:
         logger.error("Goodbye msg failed: %s", e)
 
