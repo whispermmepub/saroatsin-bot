@@ -151,13 +151,16 @@ async def on_new_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if member.is_bot:
             continue
         name = member.first_name or member.username or "friend"
-        msg = random.choice(WELCOME_MSGS).format(name=name)
+        mention = '<a href="tg://user?id={}">{}</a>'.format(member.id, name)
+        msg_template = random.choice(WELCOME_MSGS)
+        msg = msg_template.format(name=name, mention=mention)
         try:
             await update.message.delete()
         except Exception as e:
             logger.warning("Cannot delete service msg: %s", e)
         try:
-            await ctx.bot.send_message(chat_id=chat_id, text=msg)
+            parse_mode = "HTML" if "{mention}" in msg_template else None
+            await ctx.bot.send_message(chat_id=chat_id, text=msg, parse_mode=parse_mode)
         except Exception as e:
             logger.error("Welcome msg failed for %s: %s", chat_id, e)
 
@@ -176,8 +179,10 @@ async def on_left_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.warning("Cannot delete service msg: %s", e)
     try:
-        msg = GOODBYE_MSG.format(name=name)
-        await ctx.bot.send_message(chat_id=chat_id, text=msg)
+        mention = '<a href="tg://user?id={}">{}</a>'.format(member.id, name)
+        msg = GOODBYE_MSG.format(name=name, mention=mention)
+        parse_mode = "HTML" if "{mention}" in GOODBYE_MSG else None
+        await ctx.bot.send_message(chat_id=chat_id, text=msg, parse_mode=parse_mode)
     except Exception as e:
         logger.error("Goodbye msg failed: %s", e)
 
@@ -313,7 +318,7 @@ async def cmd_setwelcome(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not text:
         await update.message.reply_text(
             "အသုံးပြုပုံ - /setwelcome မင်္ဂလာပါ {name} စာအုပ်တွေ ဖတ်ပါ\n\n"
-            "{name} = ဝင်လာတဲ့သူနာမည် အလိုလိုပါမယ်"
+            "{name} = နာမည်\n{mention} = clickable mention"
         )
         return
     WELCOME_MSGS.clear()
