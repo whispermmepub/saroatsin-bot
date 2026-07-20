@@ -430,6 +430,39 @@ async def cmd_setgoodbye(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     sent = await update.message.reply_text(preview)
     asyncio.create_task(schedule_delete(sent))
 
+async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    text = (
+        "\U0001f4d6 *Saroatsin Bot*\n\n"
+        "\U0001f50d *Book Search:*\n"
+        "Type author or book name\n"
+        "In group: @botusername name\n"
+        "In private: just type name\n\n"
+        "\U0001f4cb *Commands:*\n\n"
+        "*\U0001f4d6 Search:*\n"
+        "/authors - List authors\n"
+        "/search <keyword> - Search books\n"
+        "/refresh - Reload data\n"
+        "/stats - Statistics\n\n"
+        "*\U0001f4dd Book Notes:*\n"
+        "/addnote book - 5 - Add note\n"
+        "/note book - View notes\n"
+        "/mynote - Your notes\n"
+        "/delnote <id> - Delete note\n\n"
+        "*\u2699\ufe0f Admin:*\n"
+        "/add author - title - link\n"
+        "/del author - title - link\n"
+        "/setwelcome message\n"
+        "/setgoodbye message\n"
+        "/ban (reply)\n"
+        "/unban @username\n"
+        "/addlink - domain\n"
+        "/dellink - domain\n"
+        "/spamlist"
+    )
+    sent = await update.message.reply_text(text, parse_mode="Markdown")
+    asyncio.create_task(schedule_delete(sent))
+
+
 async def cmd_addlink(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         sent = await update.message.reply_text("❌ Admin သာ ထည့်ခွင့်ရှိပါတယ်")
@@ -552,6 +585,39 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/stats - စာရင်းဇယား",
         parse_mode="Markdown",
     )
+    asyncio.create_task(schedule_delete(sent))
+
+
+async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    text = (
+        "\U0001f4d6 *Saroatsin Bot*\n\n"
+        "\U0001f50d *Book Search:*\n"
+        "Type author or book name\n"
+        "In group: @botusername name\n"
+        "In private: just type name\n\n"
+        "\U0001f4cb *Commands:*\n\n"
+        "*\U0001f4d6 Search:*\n"
+        "/authors - List authors\n"
+        "/search <keyword> - Search books\n"
+        "/refresh - Reload data\n"
+        "/stats - Statistics\n\n"
+        "*\U0001f4dd Book Notes:*\n"
+        "/addnote book - 5 - Add note\n"
+        "/note book - View notes\n"
+        "/mynote - Your notes\n"
+        "/delnote <id> - Delete note\n\n"
+        "*\u2699\ufe0f Admin:*\n"
+        "/add author - title - link\n"
+        "/del author - title - link\n"
+        "/setwelcome message\n"
+        "/setgoodbye message\n"
+        "/ban (reply)\n"
+        "/unban @username\n"
+        "/addlink - domain\n"
+        "/dellink - domain\n"
+        "/spamlist"
+    )
+    sent = await update.message.reply_text(text, parse_mode="Markdown")
     asyncio.create_task(schedule_delete(sent))
 
 
@@ -846,6 +912,7 @@ async def post_init(application: Application):
 
     commands = [
         BotCommand("start", "စတင်ရန်"),
+        BotCommand("help", "အသုံးပြုပုံ"),
         BotCommand("authors", "စာရေးသူများ"),
         BotCommand("search", "စာအုပ်ရှာရန်"),
         BotCommand("add", "စာအုပ်အသစ်ထည့်ရန်"),
@@ -894,6 +961,7 @@ def main():
 
     # Book commands
     app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("authors", cmd_authors))
     app.add_handler(CommandHandler("search", cmd_search))
     app.add_handler(CommandHandler("add", cmd_add))
