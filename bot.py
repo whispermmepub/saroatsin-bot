@@ -207,14 +207,21 @@ async def on_new_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await update.message.delete()
         except Exception as e:
             logger.warning("Cannot delete service msg: %s", e)
+        old_msg_id = ctx.bot_data.get("last_welcome_msg", {}).get(chat_id)
+        if old_msg_id:
+            try:
+                await ctx.bot.delete_message(chat_id=chat_id, message_id=old_msg_id)
+            except Exception:
+                pass
         try:
             has_custom = any(e.type == "custom_emoji" for e in ents)
             if has_custom:
-                await ctx.bot.send_message(chat_id=chat_id, text=msg, entities=ents)
+                sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg, entities=ents)
             elif "{mention}" in msg_template:
-                await ctx.bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
+                sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
             else:
-                await ctx.bot.send_message(chat_id=chat_id, text=msg)
+                sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg)
+            ctx.bot_data.setdefault("last_welcome_msg", {})[chat_id] = sent_msg.message_id
         except Exception as e:
             logger.error("Welcome msg failed for %s: %s", chat_id, e)
 
@@ -235,13 +242,20 @@ async def on_left_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         mention = '<a href="tg://user?id={}">{}</a>'.format(member.id, name)
         msg, ents = _build_message(GOODBYE_MSG, name, mention, GOODBYE_ENTITIES)
+        old_msg_id = ctx.bot_data.get("last_goodbye_msg", {}).get(chat_id)
+        if old_msg_id:
+            try:
+                await ctx.bot.delete_message(chat_id=chat_id, message_id=old_msg_id)
+            except Exception:
+                pass
         has_custom = any(e.type == "custom_emoji" for e in ents)
         if has_custom:
-            await ctx.bot.send_message(chat_id=chat_id, text=msg, entities=ents)
+            sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg, entities=ents)
         elif "{mention}" in GOODBYE_MSG:
-            await ctx.bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
+            sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
         else:
-            await ctx.bot.send_message(chat_id=chat_id, text=msg)
+            sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg)
+        ctx.bot_data.setdefault("last_goodbye_msg", {})[chat_id] = sent_msg.message_id
     except Exception as e:
         logger.error("Goodbye msg failed: %s", e)
 
@@ -392,7 +406,9 @@ async def cmd_setwelcome(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     custom_emoji_id=getattr(ent, "custom_emoji_id", None),
                 )
                 WELCOME_ENTITIES.append(new_ent)
-    sent = await update.message.reply_text(f"✅ Welcome message ပြင်ပြီးပါပြီ:\n\n{text}")
+    sample = _build_message(text, "John", '<a href="tg://user?id=12345">John</a>', WELCOME_ENTITIES)[0]
+    preview = "✅ Welcome message ကာစမင်းပြီးကျောင်း!\n\n📝 Template:\n" + text + "\n\n👀 Preview:\n" + sample
+    sent = await update.message.reply_text(preview, parse_mode="HTML")
     asyncio.create_task(schedule_delete(sent))
 
 
@@ -420,7 +436,9 @@ async def cmd_setgoodbye(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     custom_emoji_id=getattr(ent, "custom_emoji_id", None),
                 )
                 GOODBYE_ENTITIES.append(new_ent)
-    sent = await update.message.reply_text(f"✅ Goodbye message ပြင်ပြီးပါပြီ:\n\n{text}")
+    sample = _build_message(text, "John", '<a href="tg://user?id=12345">John</a>', GOODBYE_ENTITIES)[0]
+    preview = "✅ Goodbye message ကာစမင်းပြီးကျောင်း!\n\n📝 Template:\n" + text + "\n\n👀 Preview:\n" + sample
+    sent = await update.message.reply_text(preview, parse_mode="HTML")
     asyncio.create_task(schedule_delete(sent))
 
 async def cmd_addlink(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
