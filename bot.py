@@ -407,7 +407,7 @@ async def cmd_setwelcome(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 )
                 WELCOME_ENTITIES.append(new_ent)
     sample = _build_message(text, "John", '<a href="tg://user?id=12345">John</a>', WELCOME_ENTITIES)[0]
-    preview = "✅ Welcome message ကာစမင်းပြီးကျောင်း!\n\n📝 Template:\n" + text + "\n\n👀 Preview:\n" + sample
+    preview = "✅ Welcome message set!\n\n\U0001f4dd Template:\n" + text + "\n\n\U0001f440 Preview:\n" + sample
     sent = await update.message.reply_text(preview, parse_mode="HTML")
     asyncio.create_task(schedule_delete(sent))
 
@@ -437,7 +437,7 @@ async def cmd_setgoodbye(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 )
                 GOODBYE_ENTITIES.append(new_ent)
     sample = _build_message(text, "John", '<a href="tg://user?id=12345">John</a>', GOODBYE_ENTITIES)[0]
-    preview = "✅ Goodbye message ကာစမင်းပြီးကျောင်း!\n\n📝 Template:\n" + text + "\n\n👀 Preview:\n" + sample
+    preview = "✅ Goodbye message set!\n\n\U0001f4dd Template:\n" + text + "\n\n\U0001f440 Preview:\n" + sample
     sent = await update.message.reply_text(preview, parse_mode="HTML")
     asyncio.create_task(schedule_delete(sent))
 
