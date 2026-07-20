@@ -171,23 +171,11 @@ def _adjust_entities(original_text, new_text, original_entities, old_sub, new_su
     return adjusted
 
 
-def _build_message(template, name, mention, entities_template):
-    msg = template.format(name=name, mention=mention)
+def _build_message(template, name, mention, entities_template, chatname=""):
+    # Replace all known placeholders
+    msg = template.replace("{name}", name).replace("{mention}", mention).replace("{chatname}", chatname or "Group")
+    # Build entities only for custom_emoji type from template entities
     ents = list(entities_template) if entities_template else []
-    if "{name}" in template and "{mention}" in template:
-        text1 = template.replace("{name}", name)
-        ents = _adjust_entities(template, text1, ents, "{name}", name)
-        text2 = text1.replace("{mention}", mention)
-        ents = _adjust_entities(text1, text2, ents, "{mention}", mention)
-        return text2, ents
-    elif "{name}" in template:
-        text1 = template.replace("{name}", name)
-        ents = _adjust_entities(template, text1, ents, "{name}", name)
-        return text1, ents
-    elif "{mention}" in template:
-        text1 = template.replace("{mention}", mention)
-        ents = _adjust_entities(template, text1, ents, "{mention}", mention)
-        return text1, ents
     return msg, ents
 
 
@@ -203,10 +191,10 @@ async def on_new_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         mention = '<a href="tg://user?id={}">{}</a>'.format(member.id, name)
         msg_template = random.choice(WELCOME_MSGS)
         try:
-            msg, ents = _build_message(msg_template, name, mention, WELCOME_ENTITIES)
+            msg, ents = _build_message(msg_template, name, mention, WELCOME_ENTITIES, chatname=update.effective_chat.title)
         except Exception as e:
             logger.error("Welcome _build_message error: %s", e)
-            msg = msg_template.format(name=name)
+            msg = msg_template.replace("{name}", name).replace("{mention}", mention).replace("{chatname}", update.effective_chat.title or "Group")
             ents = []
         try:
             await update.message.delete()
@@ -240,7 +228,7 @@ async def on_left_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         pass
     try:
         mention = '<a href="tg://user?id={}">{}</a>'.format(member.id, name)
-        msg, ents = _build_message(GOODBYE_MSG, name, mention, GOODBYE_ENTITIES)
+        msg, ents = _build_message(GOODBYE_MSG, name, mention, GOODBYE_ENTITIES, chatname=update.effective_chat.title)
         has_custom = any(e.type == "custom_emoji" for e in ents)
         if has_custom:
             await ctx.bot.send_message(chat_id=chat_id, text=msg, entities=ents)
@@ -384,7 +372,7 @@ async def cmd_setwelcome(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not text:
         await update.message.reply_text(
             "အသုံးပြုပုံ - /setwelcome မင်္ဂလာပါ {name} စာအုပ်တွေ ဖတ်ပါ\n\n"
-            "{name} = နာမည်\n{mention} = clickable mention\nPremium emoji တွေလည်း သုံးနိုင်ပါတယ်"
+            "{name} = နာမည်\n{mention} = clickable mention\n{chatname} = group နာမည်\nPremium emoji တွေလည်း သုံးနိုင်ပါတယ်"
         )
         return
     WELCOME_MSGS.clear()
@@ -414,7 +402,7 @@ async def cmd_setgoodbye(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not text:
         await update.message.reply_text(
             "အသုံးပြုပုံ - /setgoodbye {name} ထွက်သွားပါပြီ\n\n"
-            "{name} = ထွက်သွားတဲ့သူနာမည်\n{mention} = clickable mention\n"
+            "{name} = ထွက်သွားတဲ့သူနာမည်\n{mention} = clickable mention\n{chatname} = group နာမည်\n"
             "Premium emoji တွေလည်း သုံးနိုင်ပါတယ်"
         )
         return
