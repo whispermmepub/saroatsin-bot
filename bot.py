@@ -215,7 +215,7 @@ async def on_new_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def on_left_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Goodbye message."""
+    """Goodbye message + auto-ban."""
     if not update.message or not update.message.left_chat_member:
         return
     member = update.message.left_chat_member
@@ -223,6 +223,12 @@ async def on_left_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     name = member.first_name or member.username or "friend"
     chat_id = update.effective_chat.id
+    # Auto-ban to prevent re-joining
+    try:
+        await ctx.bot.ban_chat_member(chat_id=chat_id, user_id=member.id)
+        logger.info("Auto-banned %s (%s) from %s", name, member.id, chat_id)
+    except Exception as e:
+        logger.warning("Auto-ban failed for %s: %s", name, e)
     try:
         await update.message.delete()
     except Exception:
