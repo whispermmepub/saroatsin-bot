@@ -202,7 +202,12 @@ async def on_new_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         name = member.first_name or member.username or "friend"
         mention = '<a href="tg://user?id={}">{}</a>'.format(member.id, name)
         msg_template = random.choice(WELCOME_MSGS)
-        msg, ents = _build_message(msg_template, name, mention, WELCOME_ENTITIES)
+        try:
+            msg, ents = _build_message(msg_template, name, mention, WELCOME_ENTITIES)
+        except Exception as e:
+            logger.error("Welcome _build_message error: %s", e)
+            msg = msg_template.format(name=name)
+            ents = []
         try:
             await update.message.delete()
         except Exception as e:
@@ -222,6 +227,7 @@ async def on_new_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             else:
                 sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg)
             ctx.bot_data.setdefault("last_welcome_msg", {})[chat_id] = sent_msg.message_id
+            logger.info("Welcome sent to %s for %s", chat_id, name)
         except Exception as e:
             logger.error("Welcome msg failed for %s: %s", chat_id, e)
 
