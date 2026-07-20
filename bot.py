@@ -28,7 +28,7 @@ from telegram.ext import (
 
 from scraper import fetch_books, search_books, get_authors
 
-AUTO_DELETE_SECONDS = 30
+AUTO_DELETE_SECONDS = 60
 from notes import cmd_addnote, cmd_note, cmd_mynote, cmd_delnote, handle_note_reply, notes_callback
 from spam_db import init_spam_db, add_spam_domain, remove_spam_domain, get_spam_domains
 
