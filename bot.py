@@ -209,6 +209,7 @@ async def on_new_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             else:
                 sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg)
             logger.info("Welcome sent to %s for %s", chat_id, name)
+            asyncio.create_task(schedule_delete(sent_msg))
         except Exception as e:
             logger.error("Welcome msg failed for %s: %s", chat_id, e)
 
@@ -231,12 +232,13 @@ async def on_left_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         msg, ents = _build_message(GOODBYE_MSG, name, mention, GOODBYE_ENTITIES, chatname=update.effective_chat.title)
         has_custom = any(e.type == "custom_emoji" for e in ents)
         if has_custom:
-            await ctx.bot.send_message(chat_id=chat_id, text=msg, entities=ents)
+            sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg, entities=ents)
         elif "{mention}" in GOODBYE_MSG:
-            await ctx.bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
+            sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
         else:
-            await ctx.bot.send_message(chat_id=chat_id, text=msg)
+            sent_msg = await ctx.bot.send_message(chat_id=chat_id, text=msg)
         logger.info("Goodbye sent to %s for %s", chat_id, name)
+        asyncio.create_task(schedule_delete(sent_msg))
     except Exception as e:
         logger.error("Goodbye msg failed: %s", e)
 
@@ -388,8 +390,8 @@ async def cmd_setwelcome(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 )
                 WELCOME_ENTITIES.append(new_ent)
     sample = _build_message(text, "John", '<a href="tg://user?id=12345">John</a>', WELCOME_ENTITIES)[0]
-    preview = "✅ Welcome message set!\n\n\U0001f4dd Template:\n" + text + "\n\n\U0001f440 Preview:\n" + sample
-    sent = await update.message.reply_text(preview, parse_mode="HTML")
+    preview = "✅ Welcome message set!\n\n📝 Template:\n" + text + "\n\n👀 Preview:\n" + sample
+    sent = await update.message.reply_text(preview)
     asyncio.create_task(schedule_delete(sent))
 
 
@@ -418,8 +420,8 @@ async def cmd_setgoodbye(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 )
                 GOODBYE_ENTITIES.append(new_ent)
     sample = _build_message(text, "John", '<a href="tg://user?id=12345">John</a>', GOODBYE_ENTITIES)[0]
-    preview = "✅ Goodbye message set!\n\n\U0001f4dd Template:\n" + text + "\n\n\U0001f440 Preview:\n" + sample
-    sent = await update.message.reply_text(preview, parse_mode="HTML")
+    preview = "✅ Goodbye message set!\n\n📝 Template:\n" + text + "\n\n👀 Preview:\n" + sample
+    sent = await update.message.reply_text(preview)
     asyncio.create_task(schedule_delete(sent))
 
 async def cmd_addlink(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
