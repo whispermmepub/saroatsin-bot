@@ -32,6 +32,7 @@ from scraper import fetch_books, search_books, get_authors
 AUTO_DELETE_SECONDS = 3600
 from notes import cmd_addnote, cmd_note, cmd_mynote, cmd_delnote, handle_note_reply, notes_callback
 from spam_db import init_spam_db, add_spam_domain, remove_spam_domain, get_spam_domains
+from help_db import init_help_db, add_help_item, remove_help_item, get_help_items
 
 # ── Config ──────────────────────────────────────────────
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -431,6 +432,57 @@ async def cmd_setgoodbye(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     asyncio.create_task(schedule_delete(sent))
 
 
+async def cmd_addhelp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        sent = await update.message.reply_text("\u274c Admin \u1021\u102c \u1000\u103b\u1021\u102c\u1010\u103a\u104c\u1021\u1031\u102c\u1038")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    text = update.message.text.replace("/addhelp", "", 1).strip()
+    parts = text.split(" - ")
+    if len(parts) < 2:
+        sent = await update.message.reply_text("Format: /addhelp command - description")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    command = parts[0].strip()
+    description = parts[1].strip()
+    if not command or not description:
+        sent = await update.message.reply_text("\u274c command \u1021\u1030 description \u1031\u102c\u1038\u1015\u103c\u102e\u1038")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    result = add_help_item(command, description)
+    items = get_help_items()
+    sent = await update.message.reply_text(
+        "\u2705 Help item " + ("updated" if result == "updated" else "added") + "!\n\n"
+        + command + " - " + description + "\n\n"
+        + "\U0001f4ca Total: " + str(len(items)) + " custom items"
+    )
+    asyncio.create_task(schedule_delete(sent))
+
+
+async def cmd_delhelp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        sent = await update.message.reply_text("\u274c Admin \u1021\u102c \u1011\u1031\u102c\u1015\u103c\u102e\u1038")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    text = update.message.text.replace("/delhelp", "", 1).strip()
+    parts = text.split(" - ")
+    if len(parts) < 1 or not parts[0].strip():
+        sent = await update.message.reply_text("Format: /delhelp command")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    command = parts[0].strip()
+    if remove_help_item(command):
+        items = get_help_items()
+        sent = await update.message.reply_text(
+            "\u2705 Help item deleted!\n\n"
+            + command + "\n\n"
+            + "\U0001f4ca Total: " + str(len(items)) + " custom items"
+        )
+    else:
+        sent = await update.message.reply_text("\u274c " + command + " \u1021\u1021\u103e\u102b\u1014\u103a\u1038")
+    asyncio.create_task(schedule_delete(sent))
+
+
 async def cmd_addlink(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         sent = await update.message.reply_text("❌ Admin သာ ထည့်ခွင့်ရှိပါတယ်")
@@ -585,6 +637,11 @@ async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/dellink - domain\n"
         "/spamlist"
     )
+    custom = get_help_items()
+    if custom:
+        text += "\n\n*\U0001f4dd Custom Help:*\n"
+        for item in custom:
+            text += item["command"] + " - " + item["description"] + "\n"
     sent = await update.message.reply_text(text, parse_mode="Markdown")
     asyncio.create_task(schedule_delete(sent))
 
@@ -913,6 +970,7 @@ def main():
 
     load_books()
     init_spam_db()
+    init_help_db()
 
     app = (
         Application.builder()
@@ -951,6 +1009,8 @@ def main():
     app.add_handler(CommandHandler("addlink", cmd_addlink))
     app.add_handler(CommandHandler("dellink", cmd_dellink))
     app.add_handler(CommandHandler("spamlist", cmd_spamlist))
+    app.add_handler(CommandHandler("addhelp", cmd_addhelp))
+    app.add_handler(CommandHandler("delhelp", cmd_delhelp))
 
     # Notes commands
     if NOTES_ENABLED:
