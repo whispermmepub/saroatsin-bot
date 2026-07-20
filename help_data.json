@@ -1,3 +1,8 @@
 {
-  "items": []
+  "items": [
+    {
+      "command": "ဖန်တီးသူ",
+      "description": "bot ဖန်တီးသူမှာ @wowepub ဖြစ်ပါသည်။"
+    }
+  ]
 }
