@@ -307,16 +307,16 @@ async def cmd_setwelcome(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         await update.message.reply_text("❌ Admin သာ setting ပြင်ခွင့်ရှိပါတယ်")
         return
-    if not ctx.args:
+    text = update.message.text.replace("/setwelcome", "", 1).strip()
+    if not text:
         await update.message.reply_text(
             "အသုံးပြုပုံ - /setwelcome မင်္ဂလာပါ {name} စာအုပ်တွေ ဖတ်ပါ\n\n"
             "{name} = ဝင်လာတဲ့သူနာမည် အလိုလိုပါမယ်"
         )
         return
-    msg = " ".join(ctx.args)
     WELCOME_MSGS.clear()
-    WELCOME_MSGS.append(msg)
-    sent = await update.message.reply_text(f"✅ Welcome message ပြင်ပြီးပါပြီ:\n\n{msg}")
+    WELCOME_MSGS.append(text)
+    sent = await update.message.reply_text(f"✅ Welcome message ပြင်ပြီးပါပြီ:\n\n{text}")
     asyncio.create_task(schedule_delete(sent))
 
 async def cmd_addlink(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
