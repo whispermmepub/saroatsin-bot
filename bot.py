@@ -59,6 +59,7 @@ WELCOME_MSGS = [
 ]
 GOOD_MORNING = "🌅 မင်္ဂလာနံနက်ခင်းပါ! ဒီနေ့ ဘယ်စာအုပ်ဖတ်မလဲ?"
 GOOD_NIGHT = "🌙 ညချမ်းပါ! စာအုပ်ကောင်းတစ်အုပ်နဲ့ အနားယူပါ"
+GOODBYE_MSG = "👋 {name} ထွက်သွားပါပြီ"
 
 
 def load_books():
@@ -175,7 +176,8 @@ async def on_left_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.warning("Cannot delete service msg: %s", e)
     try:
-        await ctx.bot.send_message(chat_id=chat_id, text=f"👋 {name} ထွက်သွားပါပြီ")
+        msg = GOODBYE_MSG.format(name=name)
+        await ctx.bot.send_message(chat_id=chat_id, text=msg)
     except Exception as e:
         logger.error("Goodbye msg failed: %s", e)
 
@@ -742,6 +744,7 @@ async def post_init(application: Application):
         BotCommand("ban", "Ban ရန်"),
         BotCommand("unban", "Unban ရန်"),
         BotCommand("setwelcome", "Welcome message ပြင်ရန်"),
+        BotCommand("setgoodbye", "Goodbye message ပြင်ရန်"),
         BotCommand("refresh", "ဒေတာပြန်ဖတ်ရန်"),
         BotCommand("stats", "စာရင်းဇယား"),
         BotCommand("addnote", "Note ရေးရန်"),
@@ -793,6 +796,7 @@ def main():
     app.add_handler(CommandHandler("ban", cmd_ban))
     app.add_handler(CommandHandler("unban", cmd_unban))
     app.add_handler(CommandHandler("setwelcome", cmd_setwelcome))
+    app.add_handler(CommandHandler("setgoodbye", cmd_setgoodbye))
 
     # Group events
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, on_new_member))
