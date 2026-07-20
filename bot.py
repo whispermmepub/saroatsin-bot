@@ -15,6 +15,7 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     BotCommand,
+    MessageEntity,
 )
 from telegram.ext import (
     Application,
@@ -59,6 +60,9 @@ WELCOME_MSGS = [
 ]
 GOOD_MORNING = "🌅 မင်္ဂလာနံနက်ခင်းပါ! ဒီနေ့ ဘယ်စာအုပ်ဖတ်မလဲ?"
 GOOD_NIGHT = "🌙 ညချမ်းပါ! စာအုပ်ကောင်းတစ်အုပ်နဲ့ အနားယူပါ"
+GOODBYE_MSG = "👋 {name} ထွက်သွားပါပြီ"
+WELCOME_ENTITIES = []
+GOODBYE_ENTITIES = []
 GOODBYE_MSG = "👋 {name} ထွက်သွားပါပြီ"
 
 
@@ -140,10 +144,55 @@ def is_admin(update):
     user = update.effective_user
     return user.username in ADMIN_USERNAMES
 
+def _adjust_entities(original_text, new_text, original_entities, old_sub, new_sub):
+    if not original_entities:
+        return []
+    old_idx = original_text.find(old_sub)
+    if old_idx == -1:
+        return original_entities
+    new_idx = new_text.find(new_sub)
+    if new_idx == -1:
+        return original_entities
+    delta = new_idx - old_idx
+    adjusted = []
+    for ent in original_entities:
+        o = ent.offset
+        l = ent.length
+        if o + l <= old_idx:
+            adjusted.append(ent)
+        elif o >= old_idx + len(old_sub):
+            new_ent = MessageEntity(
+                type=ent.type, offset=o + delta, length=l,
+                custom_emoji_id=getattr(ent, "custom_emoji_id", None),
+            )
+            adjusted.append(new_ent)
+        else:
+            adjusted.append(ent)
+    return adjusted
+
+
+def _build_message(template, name, mention, entities_template):
+    msg = template.format(name=name, mention=mention)
+    ents = list(entities_template) if entities_template else []
+    if "{name}" in template and "{mention}" in template:
+        text1 = template.replace("{name}", name)
+        ents = _adjust_entities(template, text1, ents, "{name}", name)
+        text2 = text1.replace("{mention}", mention)
+        ents = _adjust_entities(text1, text2, ents, "{mention}", mention)
+        return text2, ents
+    elif "{name}" in template:
+        text1 = template.replace("{name}", name)
+        ents = _adjust_entities(template, text1, ents, "{name}", name)
+        return text1, ents
+    elif "{mention}" in template:
+        text1 = template.replace("{mention}", mention)
+        ents = _adjust_entities(template, text1, ents, "{mention}", mention)
+        return text1, ents
+    return msg, ents
+
 
 # ── Group Management ─────────────────────────────────────
 async def on_new_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Welcome new members."""
     if not update.message or not update.message.new_chat_members:
         return
     chat_id = update.effective_chat.id
@@ -153,14 +202,19 @@ async def on_new_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         name = member.first_name or member.username or "friend"
         mention = '<a href="tg://user?id={}">{}</a>'.format(member.id, name)
         msg_template = random.choice(WELCOME_MSGS)
-        msg = msg_template.format(name=name, mention=mention)
+        msg, ents = _build_message(msg_template, name, mention, WELCOME_ENTITIES)
         try:
             await update.message.delete()
         except Exception as e:
             logger.warning("Cannot delete service msg: %s", e)
         try:
-            parse_mode = "HTML" if "{mention}" in msg_template else None
-            await ctx.bot.send_message(chat_id=chat_id, text=msg, parse_mode=parse_mode)
+            has_custom = any(e.type == "custom_emoji" for e in ents)
+            if has_custom:
+                await ctx.bot.send_message(chat_id=chat_id, text=msg, entities=ents)
+            elif "{mention}" in msg_template:
+                await ctx.bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
+            else:
+                await ctx.bot.send_message(chat_id=chat_id, text=msg)
         except Exception as e:
             logger.error("Welcome msg failed for %s: %s", chat_id, e)
 
@@ -180,9 +234,14 @@ async def on_left_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         logger.warning("Cannot delete service msg: %s", e)
     try:
         mention = '<a href="tg://user?id={}">{}</a>'.format(member.id, name)
-        msg = GOODBYE_MSG.format(name=name, mention=mention)
-        parse_mode = "HTML" if "{mention}" in GOODBYE_MSG else None
-        await ctx.bot.send_message(chat_id=chat_id, text=msg, parse_mode=parse_mode)
+        msg, ents = _build_message(GOODBYE_MSG, name, mention, GOODBYE_ENTITIES)
+        has_custom = any(e.type == "custom_emoji" for e in ents)
+        if has_custom:
+            await ctx.bot.send_message(chat_id=chat_id, text=msg, entities=ents)
+        elif "{mention}" in GOODBYE_MSG:
+            await ctx.bot.send_message(chat_id=chat_id, text=msg, parse_mode="HTML")
+        else:
+            await ctx.bot.send_message(chat_id=chat_id, text=msg)
     except Exception as e:
         logger.error("Goodbye msg failed: %s", e)
 
@@ -310,7 +369,7 @@ async def cmd_unban(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_setwelcome(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Set custom welcome message. /setwelcome မင်္ဂလာပါ {name}"""
+    global WELCOME_ENTITIES
     if not is_admin(update):
         await update.message.reply_text("❌ Admin သာ setting ပြင်ခွင့်ရှိပါတယ်")
         return
@@ -318,12 +377,50 @@ async def cmd_setwelcome(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not text:
         await update.message.reply_text(
             "အသုံးပြုပုံ - /setwelcome မင်္ဂလာပါ {name} စာအုပ်တွေ ဖတ်ပါ\n\n"
-            "{name} = နာမည်\n{mention} = clickable mention"
+            "{name} = နာမည်\n{mention} = clickable mention\nPremium emoji တွေလည်း သုံးနိုင်ပါတယ်"
         )
         return
     WELCOME_MSGS.clear()
     WELCOME_MSGS.append(text)
+    cmd_len = len("/setwelcome ") 
+    WELCOME_ENTITIES = []
+    if update.message.entities:
+        for ent in update.message.entities:
+            if ent.offset >= cmd_len:
+                new_ent = MessageEntity(
+                    type=ent.type, offset=ent.offset - cmd_len, length=ent.length,
+                    custom_emoji_id=getattr(ent, "custom_emoji_id", None),
+                )
+                WELCOME_ENTITIES.append(new_ent)
     sent = await update.message.reply_text(f"✅ Welcome message ပြင်ပြီးပါပြီ:\n\n{text}")
+    asyncio.create_task(schedule_delete(sent))
+
+
+async def cmd_setgoodbye(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    global GOODBYE_MSG, GOODBYE_ENTITIES
+    if not is_admin(update):
+        await update.message.reply_text("❌ Admin သာ setting ပြင်ခွင့်ရှိပါတယ်")
+        return
+    text = update.message.text.replace("/setgoodbye", "", 1).strip()
+    if not text:
+        await update.message.reply_text(
+            "အသုံးပြုပုံ - /setgoodbye {name} ထွက်သွားပါပြီ\n\n"
+            "{name} = ထွက်သွားတဲ့သူနာမည်\n{mention} = clickable mention\n"
+            "Premium emoji တွေလည်း သုံးနိုင်ပါတယ်"
+        )
+        return
+    GOODBYE_MSG = text
+    cmd_len = len("/setgoodbye ")
+    GOODBYE_ENTITIES = []
+    if update.message.entities:
+        for ent in update.message.entities:
+            if ent.offset >= cmd_len:
+                new_ent = MessageEntity(
+                    type=ent.type, offset=ent.offset - cmd_len, length=ent.length,
+                    custom_emoji_id=getattr(ent, "custom_emoji_id", None),
+                )
+                GOODBYE_ENTITIES.append(new_ent)
+    sent = await update.message.reply_text(f"✅ Goodbye message ပြင်ပြီးပါပြီ:\n\n{text}")
     asyncio.create_task(schedule_delete(sent))
 
 async def cmd_addlink(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
