@@ -580,6 +580,42 @@ async def good_night(ctx: ContextTypes.DEFAULT_TYPE):
             logger.error("Night msg failed for %s: %s", chat_id, e)
 
 
+
+async def hourly_book_suggestion(ctx: ContextTypes.DEFAULT_TYPE):
+    """Send a random book suggestion to all tracked groups every hour."""
+    global BOOKS
+    if not BOOKS:
+        logger.warning("No books loaded, skipping hourly suggestion")
+        return
+    book = random.choice(BOOKS)
+    title = book.get("title", "")
+    author = book.get("author", "")
+    link = book.get("link", "")
+    
+    text = (
+        "📚 စာဖတ်ချင်စရာ\n\n"
+        f"📖 {title}\n"
+        f"✍️ {author}\n\n"
+        "👇 စာဖတ်ရန်"
+    )
+    
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("📖 စာအုပ်ဖတ်ရန်", url=link)
+    ]])
+    
+    chat_ids = ctx.bot_data.get("group_chat_ids", [])
+    for chat_id in chat_ids:
+        try:
+            sent = await ctx.bot.send_message(
+                chat_id=chat_id,
+                text=text,
+                reply_markup=keyboard
+            )
+            asyncio.create_task(schedule_delete(sent))
+        except Exception as e:
+            logger.error("Hourly suggestion failed for %s: %s", chat_id, e)
+
+
 async def track_group(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Track group chat IDs for scheduled messages."""
     if update.effective_chat.type in ("group", "supergroup"):
@@ -938,6 +974,7 @@ async def post_init(application: Application):
         if job_queue:
             job_queue.run_daily(good_morning, time=dt_time(hour=7, minute=0, tzinfo=MYANMAR_TZ))
             job_queue.run_daily(good_night, time=dt_time(hour=21, minute=0, tzinfo=MYANMAR_TZ))
+            job_queue.run_repeating(hourly_book_suggestion, interval=3600, first=3600)
             logger.info("Scheduled messages set up")
         else:
             logger.warning("Job queue not available, scheduled messages disabled")
