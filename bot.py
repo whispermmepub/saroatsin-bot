@@ -837,9 +837,9 @@ async def _do_search(update, ctx, query):
     page = 0
     text, markup = _results_page(results, query, page)
     sent = await update.message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
-    # Auto-hide search results after 30 seconds
+    # Auto-hide search results
     async def _auto_delete():
-        await asyncio.sleep(30)
+        await asyncio.sleep(AUTO_DELETE_SECONDS)
         try:
             await sent.delete()
         except Exception:
