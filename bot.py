@@ -963,6 +963,11 @@ async def cmd_refresh(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     asyncio.create_task(schedule_delete(sent))
 
 
+async def cmd_testhourly(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Test: send hourly book suggestion immediately."""
+    await ctx.bot.send_message(chat_id=update.effective_chat.id, text="⏰ Testing hourly suggestion...")
+    await hourly_book_suggestion(ctx)
+
 async def post_init(application: Application):
     global BOT_USERNAME
     try:
@@ -1048,6 +1053,7 @@ def main():
     app.add_handler(CommandHandler("add", cmd_add))
     app.add_handler(CommandHandler("del", cmd_del))
     app.add_handler(CommandHandler("refresh", cmd_refresh))
+    app.add_handler(CommandHandler("testhourly", cmd_testhourly))
     app.add_handler(CommandHandler("stats", cmd_stats))
 
     # Group management commands
