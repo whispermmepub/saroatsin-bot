@@ -879,7 +879,12 @@ async def _do_search(update, ctx, query):
         )
         return
     page = 0
-    text, markup = _results_page(results, query, page)
+    # Generate short callback key to avoid Telegram 64-byte callback_data limit
+    cb_key = str(len([k for k in (ctx.bot_data.get("search_keys") or {}) if not k.startswith("_")]))
+    if ctx.bot_data.get("search_keys") is None:
+        ctx.bot_data["search_keys"] = {}
+    ctx.bot_data["search_keys"][cb_key] = {"q": query, "r": results if len(results) <= 200 else results[:200]}
+    text, markup = _results_page(results, query, page, cb_key)
     sent = await update.message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
     # Auto-hide search results
     async def _auto_delete():
@@ -891,7 +896,7 @@ async def _do_search(update, ctx, query):
     asyncio.create_task(_auto_delete())
 
 
-def _results_page(results, query, page):
+def _results_page(results, query, page, cb_key=""):
     total = len(results)
     start = page * RESULTS_PER_PAGE
     end = min(start + RESULTS_PER_PAGE, total)
@@ -906,9 +911,9 @@ def _results_page(results, query, page):
         buttons.append([InlineKeyboardButton(f"📖 {b['title'][:30]}", url=b["link"])])
     nav = []
     if page > 0:
-        nav.append(InlineKeyboardButton("◀️", callback_data=f"r|{query}|{page - 1}"))
+        nav.append(InlineKeyboardButton("◀️", callback_data=f"r|{cb_key}|{page - 1}"))
     if page < total_pages - 1:
-        nav.append(InlineKeyboardButton("▶️", callback_data=f"r|{query}|{page + 1}"))
+        nav.append(InlineKeyboardButton("▶️", callback_data=f"r|{cb_key}|{page + 1}"))
     if nav:
         buttons.append(nav)
     markup = InlineKeyboardMarkup(buttons) if buttons else None
@@ -943,21 +948,31 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     data = query.data
     if not data:
         return
-    parts = data.split("|", 2)
-    if parts[0] == "r" and len(parts) == 3:
-        search_query = parts[1]
-        page = int(parts[2])
-        results = search_books(BOOKS, search_query)
-        if not results:
-            await query.edit_message_text("ဒေတာ ပြန်လည်ရှာဖွေနေပါသည်...")
-            return
-        text, markup = _results_page(results, search_query, page)
-        await query.edit_message_text(text, reply_markup=markup, parse_mode="Markdown")
-    elif parts[0] == "a" and len(parts) == 2:
-        page = int(parts[1])
-        authors = get_authors(BOOKS)
-        text, markup = _author_page(authors, page)
-        await query.edit_message_text(text, reply_markup=markup, parse_mode="Markdown")
+    try:
+        parts = data.split("|", 2)
+        if parts[0] == "r" and len(parts) == 3:
+            cb_key = parts[1]
+            page = int(parts[2])
+            keys = ctx.bot_data.get("search_keys", {})
+            cached = keys.get(cb_key, {})
+            search_query = cached.get("q", "")
+            results = cached.get("r") or search_books(BOOKS, search_query)
+            if not results:
+                await query.edit_message_text("ဒေတာ ပြန်လည်ရှာဖွေနေပါသည်...")
+                return
+            text, markup = _results_page(results, search_query, page, cb_key)
+            await query.edit_message_text(text, reply_markup=markup, parse_mode="Markdown")
+        elif parts[0] == "a" and len(parts) == 2:
+            page = int(parts[1])
+            authors = get_authors(BOOKS)
+            text, markup = _author_page(authors, page)
+            await query.edit_message_text(text, reply_markup=markup, parse_mode="Markdown")
+    except Exception as e:
+        logger.error("Callback handler error: %s data=%s", e, data)
+        try:
+            await query.edit_message_text("❌ Error occurred. Try searching again.")
+        except Exception:
+            pass
 
 
 async def cmd_refresh(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
