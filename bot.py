@@ -54,6 +54,7 @@ BOOKS = []
 BOOKS_BY_AUTHOR = {}
 RAW_DATA = []
 BOT_USERNAME = ""
+RECENTLY_SENT = set()
 WELCOME_MSGS = [
     "🎉 {name} ကို ကြိုဆိုပါတယ်!",
     "🌟 {name} welcome! စာအုပ်တွေ ဖတ်ချင်ရင် bot ကို သုံးကြည့်ပါ",
@@ -587,20 +588,24 @@ async def hourly_book_suggestion(ctx: ContextTypes.DEFAULT_TYPE):
     if not BOOKS:
         logger.warning("No books loaded, skipping hourly suggestion")
         return
-    book = random.choice(BOOKS)
+    # Avoid repeating recently sent books
+    available = [b for b in BOOKS if f"{b.get('author','')}-{b.get('title','')}" not in RECENTLY_SENT]
+    if not available:
+        RECENTLY_SENT.clear()
+        available = BOOKS
+    book = random.choice(available)
     title = book.get("title", "")
     author = book.get("author", "")
     link = book.get("link", "")
+    RECENTLY_SENT.add(f"{author}-{title}")
     
     text = (
-        "📚 စာဖတ်ချင်စရာ\n\n"
-        f"📖 {title}\n"
-        f"✍️ {author}\n\n"
-        "👇 စာဖတ်ရန်"
+        "📖 ဒီနေ့အတွက် ဖတ်စရာ\n\n"
+        f"✍️ {author}\n"
+        f"📕 {title}"
     )
-    
     keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("📖 စာအုပ်ဖတ်ရန်", url=link)
+        InlineKeyboardButton("🔗 ဖတ်ရန်", url=link)
     ]])
     
     chat_ids = ctx.bot_data.get("group_chat_ids", [])
