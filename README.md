@@ -44,6 +44,7 @@
 | 🚫 **Auto Ban** | ထွက်သွားသူကို Auto-ban ပြုလုပ်ပေးပါသည် |
 | 🧹 **Auto Delete** | Bot messages များကို စက္ကန့် ၆၀ အတွင်း Auto-delete လုပ်ပေးပါသည် |
 | 🌅 **မနက်/ည နှုတ်ဆက်စာ** | အလိုအလျောက် မနက်ခင်း/ညခင်း နှုတ်ဆက်စာ ပို့ပေးပါသည် |
+| 📢 **တစ်နာရီတစ်ခါ စာအုပ် အကြံပြုချက်** | တစ်နာရီတိုင်း ကွာကွာ စာအုပ်တစ်အုပ်စီ အလိုအလျောက် ပို့ပေးပါသည် |
 | 🎨 **Premium Emoji** | Telegram premium emoji များ သုံးနိုင်ပါသည် |
 
 ## 🎯 Bot Commands
@@ -80,6 +81,7 @@
 | `/addlink - domain` | Spam domain ထည့်ရန် |
 | `/dellink - domain` | Spam domain ဖျက်ရန် |
 | `/spamlist` | Blocked domains ကြည့်ရန် |
+| `/testhourly` | Hourly suggestion စမ်းရန် (Admin) |
 
 ## 👋 Welcome/Goodbye Message ပြင်နည်း
 
@@ -171,6 +173,7 @@ saroatsin-bot/
 ├── notes.py            # Book notes commands (addnote, note, mynote, delnote)
 ├── notes_db.py         # Notes storage via GitHub API
 ├── spam_db.py          # Custom spam domains storage via GitHub API
+├── help_db.py          # Custom help items storage via GitHub API
 ├── requirements.txt    # Python dependencies
 ├── Dockerfile          # Railway deploy config
 └── README.md           # This file

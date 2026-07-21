@@ -676,7 +676,10 @@ async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/unban @username\n"
         "/addlink - domain\n"
         "/dellink - domain\n"
-        "/spamlist"
+        "/spamlist\n\n"
+        "*\U0001f4e2 Auto Book Suggestion:*\n"
+        "Every hour, a random book is\n"
+        "automatically sent to groups."
     )
     custom = get_help_items()
     if custom:
