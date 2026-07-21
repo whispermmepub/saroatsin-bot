@@ -924,39 +924,52 @@ async def cmd_refresh(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def post_init(application: Application):
     global BOT_USERNAME
-    me = await application.bot.get_me()
-    BOT_USERNAME = me.username
-    logger.info("Bot username: @%s", BOT_USERNAME)
+    try:
+        me = await application.bot.get_me()
+        BOT_USERNAME = me.username
+        logger.info("Bot username: @%s", BOT_USERNAME)
+    except Exception as e:
+        logger.error("Failed to get bot info: %s", e)
 
-    # Schedule morning (7 AM Myanmar = 00:30 UTC) and night (9 PM Myanmar = 14:30 UTC)
-    from datetime import timezone, timedelta, time as dt_time
-    MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
-    job_queue = application.job_queue
-    job_queue.run_daily(good_morning, time=dt_time(hour=7, minute=0, tzinfo=MYANMAR_TZ))
-    job_queue.run_daily(good_night, time=dt_time(hour=21, minute=0, tzinfo=MYANMAR_TZ))
+    try:
+        from datetime import timezone, timedelta, time as dt_time
+        MYANMAR_TZ = timezone(timedelta(hours=6, minutes=30))
+        job_queue = application.job_queue
+        if job_queue:
+            job_queue.run_daily(good_morning, time=dt_time(hour=7, minute=0, tzinfo=MYANMAR_TZ))
+            job_queue.run_daily(good_night, time=dt_time(hour=21, minute=0, tzinfo=MYANMAR_TZ))
+            logger.info("Scheduled messages set up")
+        else:
+            logger.warning("Job queue not available, scheduled messages disabled")
+    except Exception as e:
+        logger.error("Failed to setup scheduled messages: %s", e)
 
-    commands = [
-        BotCommand("start", "စတင်ရန်"),
-        BotCommand("help", "အသုံးပြုပုံ"),
-        BotCommand("authors", "စာရေးသူများ"),
-        BotCommand("search", "စာအုပ်ရှာရန်"),
-        BotCommand("add", "စာအုပ်အသစ်ထည့်ရန်"),
-        BotCommand("del", "စာအုပ်ဖျက်ရန်"),
-        BotCommand("ban", "Ban ရန်"),
-        BotCommand("unban", "Unban ရန်"),
-        BotCommand("setwelcome", "Welcome message ပြင်ရန်"),
-        BotCommand("setgoodbye", "Goodbye message ပြင်ရန်"),
-        BotCommand("refresh", "ဒေတာပြန်ဖတ်ရန်"),
-        BotCommand("stats", "စာရင်းဇယား"),
-        BotCommand("addnote", "Note ရေးရန်"),
-        BotCommand("note", "စာအုပ် Note ကြည့်ရန်"),
-        BotCommand("mynote", "ကိုယ့် Note များ"),
-        BotCommand("delnote", "Note ဖျက်ရန်"),
-        BotCommand("addlink", "Spam domain ထည့်ရန်"),
-        BotCommand("dellink", "Spam domain ဖျက်ရန်"),
-        BotCommand("spamlist", "Blocked domains ကြည့်ရန်"),
-    ]
-    await application.bot.set_my_commands(commands)
+    try:
+        commands = [
+            BotCommand("start", "စတင်ရန်"),
+            BotCommand("help", "အသုံးပြုပုံ"),
+            BotCommand("authors", "စာရေးသူများ"),
+            BotCommand("search", "စာအုပ်ရှာရန်"),
+            BotCommand("add", "စာအုပ်အသစ်ထည့်ရန်"),
+            BotCommand("del", "စာအုပ်ဖျက်ရန်"),
+            BotCommand("ban", "Ban ရန်"),
+            BotCommand("unban", "Unban ရန်"),
+            BotCommand("setwelcome", "Welcome message ပြင်ရန်"),
+            BotCommand("setgoodbye", "Goodbye message ပြင်ရန်"),
+            BotCommand("refresh", "ဒေတာပြန်ဖတ်ရန်"),
+            BotCommand("stats", "စာရင်းဇယား"),
+            BotCommand("addnote", "Note ရေးရန်"),
+            BotCommand("note", "စာအုပ် Note ကြည့်ရန်"),
+            BotCommand("mynote", "ကိုယ့် Note များ"),
+            BotCommand("delnote", "Note ဖျက်ရန်"),
+            BotCommand("addlink", "Spam domain ထည့်ရန်"),
+            BotCommand("dellink", "Spam domain ဖျက်ရန်"),
+            BotCommand("spamlist", "Blocked domains ကြည့်ရန်"),
+        ]
+        await application.bot.set_my_commands(commands)
+        logger.info("Bot commands registered")
+    except Exception as e:
+        logger.error("Failed to set bot commands: %s", e)
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
