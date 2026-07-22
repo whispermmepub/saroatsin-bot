@@ -884,6 +884,10 @@ async def _do_search(update, ctx, query):
     if ctx.bot_data.get("search_keys") is None:
         ctx.bot_data["search_keys"] = {}
     ctx.bot_data["search_keys"][cb_key] = {"q": query, "r": results if len(results) <= 200 else results[:200]}
+    # Also store reverse mapping: query -> cb_key for fallback
+    if ctx.bot_data.get("query_to_key") is None:
+        ctx.bot_data["query_to_key"] = {}
+    ctx.bot_data["query_to_key"][query.lower()] = cb_key
     text, markup = _results_page(results, query, page, cb_key)
     sent = await update.message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
     # Auto-hide search results
@@ -953,14 +957,21 @@ async def callback_handler(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if parts[0] == "r" and len(parts) == 3:
             cb_key = parts[1]
             page = int(parts[2])
+            # Try cb_key lookup from bot_data cache
             keys = ctx.bot_data.get("search_keys", {})
             cached = keys.get(cb_key, {})
             search_query = cached.get("q", "")
-            results = cached.get("r") or search_books(BOOKS, search_query)
+            results = cached.get("r")
+            # Fallback: if cache miss, try re-searching
+            if not results and search_query:
+                results = search_books(BOOKS, search_query)
+            # Fallback: if still no results, try searching with cb_key as query
+            if not results and cb_key:
+                results = search_books(BOOKS, cb_key)
             if not results:
-                await query.edit_message_text("ဒေတာ ပြန်လည်ရှာဖွေနေပါသည်...")
+                await query.edit_message_text("ဒေတာ ပြန်လည်ရှာဖွေနေပါသည်... /refresh ရိုက်ပါ")
                 return
-            text, markup = _results_page(results, search_query, page, cb_key)
+            text, markup = _results_page(results, search_query or cb_key, page, cb_key)
             await query.edit_message_text(text, reply_markup=markup, parse_mode="Markdown")
         elif parts[0] == "a" and len(parts) == 2:
             page = int(parts[1])
@@ -1110,7 +1121,7 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text), group=2)
 
     logger.info("Bot is starting...")
-    app.run_polling(drop_pending_updates=True)
+    app.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
