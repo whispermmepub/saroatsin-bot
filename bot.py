@@ -677,6 +677,9 @@ async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/addlink - domain\n"
         "/dellink - domain\n"
         "/spamlist\n\n"
+        "*\U0001f50d Quick Search:*\n"
+        "/ဂျူး, /မြသန်းတင့် ရိုက်ရုံနဲ့ ရှာနိုင်\n"
+        "ဥပမာ - /ဂျူး, /မြသန်းတင့်\n\n"
         "*\U0001f4e2 Auto Book Suggestion:*\n"
         "Every hour, a random book is\n"
         "automatically sent to groups."
@@ -826,6 +829,33 @@ async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     query = " ".join(ctx.args)
     await _do_search(update, ctx, query)
 
+
+async def on_burmese_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Handle /BurmeseText as a search command (e.g. /ဂျူး, /မြသန်းတင့်)."""
+    if not update.message or not update.message.text:
+        return
+    text = update.message.text.strip()
+    # Remove leading / and take the command part
+    cmd = text.split()[0] if text.split() else ""
+    if not cmd.startswith("/"):
+        return
+    cmd_name = cmd[1:]  # remove /
+    if not cmd_name:
+        return
+    # Check if it contains Burmese characters (Unicode 1000-109F, AA60-AA7F)
+    if not re.search(r'[က-႟ꩠ-ꩿ]', cmd_name):
+        return
+    # Known commands to skip (already handled by CommandHandler)
+    known = {"start","help","authors","search","add","del","refresh","testhourly",
+             "stats","ban","unban","setwelcome","setgoodbye","addlink","dellink",
+             "spamlist","addhelp","delhelp","addnote","note","mynote","delnote"}
+    if cmd_name.lower() in known:
+        return
+    # Use command name as search query (e.g. /ဂျူး -> search "ဂျူး")
+    query = cmd_name
+    if not query:
+        return
+    await _do_search(update, ctx, query)
 
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
@@ -1117,6 +1147,10 @@ def main():
 
     # Search + author callbacks (with pattern filter)
     app.add_handler(CallbackQueryHandler(callback_handler, pattern=r"^(r\||a\|)"))
+
+    # Burmese command search: /ဂျူး, /မြသန်းတင့် etc.
+    app.add_handler(MessageHandler(filters.COMMAND & filters.TEXT, on_burmese_command))
+
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, spam_filter), group=1)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text), group=2)
 
