@@ -39,13 +39,17 @@ def fetch_books(url=DATA_URL, retries=3, delay=5):
 
 
 def search_books(books, query):
-    """Search books by author name or title (case-insensitive, partial match)."""
+    """Search books by author name or title (case-insensitive, space-insensitive partial match)."""
     q = query.lower().strip()
     if not q:
         return []
+    # Normalize: remove spaces for flexible matching
+    q_nospace = q.replace(" ", "")
     return [
         b for b in books
         if q in b["author"].lower() or q in b["title"].lower()
+        or q_nospace in b["author"].lower().replace(" ", "")
+        or q_nospace in b["title"].lower().replace(" ", "")
     ]
 
 
