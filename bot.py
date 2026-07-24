@@ -310,41 +310,45 @@ def is_url_allowed(url: str) -> bool:
     return True
 
 
-async def spam_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Auto-delete messages with non-whitelisted links + forwarded messages in groups."""
+async def forward_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Delete ALL forwarded messages in groups (text, photo, video, doc, etc)."""
     if not update.message:
         return
     chat = update.effective_chat
     if chat.type not in ("group", "supergroup"):
         return
-
-    # --- Forward filter: delete ALL forwards except whitelisted bots ---
     is_forwarded = (
         update.message.forward_from
         or update.message.forward_sender_name
         or update.message.forward_from_chat
         or update.message.forward_origin
     )
-    if is_forwarded:
-        fwd_user = update.message.forward_from
-        if fwd_user and fwd_user.is_bot:
-            bot_name = fwd_user.username or ""
-            if is_forward_allowed(bot_name):
-                return  # Allow forwarded messages from whitelisted bots
-        # Also allow whitelisted bots via channel forward
-        fwd_chat = update.message.forward_from_chat
-        if fwd_chat and fwd_chat.type == "channel":
-            chat_name = fwd_chat.username or ""
-            if is_forward_allowed(chat_name):
-                return
-        try:
-            await update.message.delete()
-            logger.info("Forwarded message deleted in %s", chat.id)
-        except Exception as e:
-            logger.error("Failed to delete forward: %s", e)
+    if not is_forwarded:
         return
+    fwd_user = update.message.forward_from
+    if fwd_user and fwd_user.is_bot:
+        bot_name = fwd_user.username or ""
+        if is_forward_allowed(bot_name):
+            return
+    fwd_chat = update.message.forward_from_chat
+    if fwd_chat and fwd_chat.type == "channel":
+        chat_name = fwd_chat.username or ""
+        if is_forward_allowed(chat_name):
+            return
+    try:
+        await update.message.delete()
+        logger.info("Forwarded message deleted in %s", chat.id)
+    except Exception as e:
+        logger.error("Failed to delete forward: %s", e)
 
-    # --- Link filter: delete ALL links except whitelisted ---
+
+async def spam_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Auto-delete messages with non-whitelisted links in groups."""
+    if not update.message:
+        return
+    chat = update.effective_chat
+    if chat.type not in ("group", "supergroup"):
+        return
     text = update.message.text or ""
     urls = URL_RE.findall(text)
     if not urls:
@@ -1436,6 +1440,7 @@ def main():
     app.add_handler(InlineQueryHandler(on_inline_query))
     app.add_handler(MessageHandler(filters.COMMAND & filters.TEXT, on_burmese_command))
 
+    app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND & filters.ChatType.GROUPS, forward_filter), group=1)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, keyword_filter), group=1)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, spam_filter), group=1)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text), group=2)
