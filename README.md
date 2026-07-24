@@ -213,20 +213,37 @@ saroatsin-bot/
 
 ## 🛡️ Link & Forward Protection
 
-**Link Filter:** ခွင့်ပြုထားတဲ့ domain တွေကလွဲလို့ ကျန်တဲ့ link အားလုံးကို auto-delete လုပ်ပေးပါတယ်။
+### 🔗 Link Filter
+- `https://`, `http://`, `t.me/`, `tg://`, `www.`, bare domain — ဘာပဲဖြစ်ဖြစ် ဖမ်းမိတယ်
+- **Whitelist ထဲမပါရင်** → ချက်ခြင်း auto-delete
+- **Whitelist ထဲပါရင်** → ခွင့်ပြုတယ်
+- `/whitelist - domain` ဖြင့် ထည့်၊ `/delwhitelist - domain` ဖြင့် ဖျက်
 
-**Forward Filter:** Group ထဲ forward လုပ်တာ မှန်သမျှ ဖျက်ပေးပါတယ်။ @wowepubsearch_bot နဲ့ @MissRose_bot ကလွဲလို့။
+### 📨 Forward Filter
+- **Forward (link ပါပါ မပါပါ)** → ချက်ခြင်း ဖျက်
+- Channel, Group, User, Bot — ဘယ်ကပဲ forward လာလာ ဖျက်
+- **ခြွင်းချက်:** `@wowepubsearch_bot` နဲ့ `@MissRose_bot` ကလွဲလို့
 
-| Whitelist (ခွင့်ပြု) | Command |
-|-------------------|---------|
-| Facebook, YouTube | Default ပါပြီး |
-| Twitter/X, TikTok | Default ပါပြီး |
-| Blogspot, Wikipedia | Default ပါပြီး |
-| saroatsin.com | Default ပါပြီး |
-| TheBookR, refthebook | Default ပါပြီး |
-| @wowepubsearch_bot | Forward ခွင့်ပြု |
-| @MissRose_bot | Forward ခွင့်ပြု |
-| Custom domains | `/whitelist` ဖြင့် ထည့် |
+### ✅ Default Whitelist (ခွင့်ပြုထားသည်)
+
+| Link Whitelist | Forward Whitelist |
+|---------------|-------------------|
+| facebook.com | @wowepubsearch_bot |
+| youtube.com | @MissRose_bot |
+| twitter.com / x.com | |
+| tiktok.com | |
+| blogspot.com | |
+| wikipedia.org | |
+| saroatsin.com | |
+| whispermmepub.github.io | |
+
+### 📝 Whitelist Commands
+
+| Command | ဘာလုပ်လဲ |
+|---------|-----------|
+| `/whitelist - domain` | Whitelist ထဲ ထည့် |
+| `/delwhitelist - domain` | Whitelist က ဖျက် |
+| `/whitelistlist` | Whitelist ကြည့် |
 
 ## 🚫 Auto Ban
 
