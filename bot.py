@@ -278,7 +278,7 @@ BLOCKED_DOMAINS = [
     "redtube.com", "youporn.com", "brazzers.com",
 ]
 
-URL_RE = re.compile(r"https?://\S+")
+URL_RE = re.compile(r"(https?://\S+|t\.me/\S+|tg://\S+|www\.\S+|[a-z0-9-]+\.[a-z]{2,}/\S+|[a-z0-9-]+\.[a-z]{2,}\b)")
 
 
 def is_url_allowed(url: str) -> bool:
