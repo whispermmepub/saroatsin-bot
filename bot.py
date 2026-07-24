@@ -848,7 +848,7 @@ async def on_burmese_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # Known commands to skip (already handled by CommandHandler)
     known = {"start","help","authors","search","add","del","refresh","testhourly",
              "stats","ban","unban","setwelcome","setgoodbye","addlink","dellink",
-             "spamlist","addhelp","delhelp","addnote","note","mynote","delnote"}
+             "spamlist","addhelp","delhelp","addnote","note","mynote","delnote","find"}
     if cmd_name.lower() in known:
         return
     # Use command name as search query (e.g. /ဂျူး -> search "ဂျူး")
@@ -1109,6 +1109,7 @@ def main():
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("authors", cmd_authors))
     app.add_handler(CommandHandler("search", cmd_search))
+    app.add_handler(CommandHandler("find", cmd_search))
     app.add_handler(CommandHandler("add", cmd_add))
     app.add_handler(CommandHandler("del", cmd_del))
     app.add_handler(CommandHandler("refresh", cmd_refresh))

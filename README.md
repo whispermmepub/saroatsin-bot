@@ -70,6 +70,7 @@
 | `/start` | Bot စတင်ရန် |
 | `/authors` | စာရေးသူများ စာရင်း |
 | `/search <keyword>` | စာအုပ်ရှာဖွေရန် |
+| `/find <keyword>` | စာအုပ်ရှာဖွေရန် (`/search` နဲ့ အတူတူပါပဲ) |
 | `/refresh` | ဒေတာပြန်ဖတ်ရန် |
 | `/stats` | စာရင်းဇယား |
 
@@ -213,6 +214,7 @@ saroatsin-bot/
 
 | ရက်စွဲ | ပြောင်းလဲချက် |
 |---------|----------------|
+| 2026-07-24 | /find command: /search နဲ့ alias အဖြစ် ထည့် |
 | 2026-07-22 | /缅甸text search: /ဂျူး, /မြသန်းတင့် ရိုက်ရုံနဲ့ ရှာနိုင် |
 | 2026-07-22 | Space-insensitive search: space မခြားဘဲ စာအုပ်ရှာနိုင် |
 | 2026-07-22 | Pagination fix: 64-byte callback_data limit ကျော်မှု ပြင်ဆင် |
