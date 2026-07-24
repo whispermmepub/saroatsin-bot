@@ -642,7 +642,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "စာရေးသူ နာမည် (သို့) စာအုပ်နာမည် ရိုက်ထည့်ပါ\n\n"
         "📢 Group ထဲမှာ - @botusername စာရေးသူနာမည်\n\n"
         "/authors - စာရေးသူများ\n"
-        "/search <keyword> - ရှာဖွေရန်\n"
+        "/search စာအုပ်နာမည် သို့မဟုတ် စာရေးသူ - ရှာဖွေရန်\n"
         "/add စာရေးသူ - စာအုပ် - link - စာအုပ်အသစ်ထည့်\n"
         "/ban - ban ရန် (reply)\n"
         "/unban @username - unban ရန်\n"
@@ -663,7 +663,7 @@ async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "\U0001f4cb *Commands:*\n\n"
         "*\U0001f4d6 Search:*\n"
         "/authors - List authors\n"
-        "/search <keyword> - Search books\n"
+        "/search book/author name - Search books\n"
         "/refresh - Reload data\n"
         "/stats - Statistics\n\n"
         "*\U0001f4dd Book Notes:*\n"
@@ -827,7 +827,7 @@ async def cmd_authors(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not ctx.args:
-        sent = await update.message.reply_text("အသုံးပြုပုံ - /search < keyword >")
+        sent = await update.message.reply_text("Format: /search စာအုပ်နာမည် သို့မဟုတ် စာရေးသူ")
         asyncio.create_task(schedule_delete(sent))
         return
     query = " ".join(ctx.args)
