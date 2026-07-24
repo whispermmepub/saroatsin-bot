@@ -49,6 +49,7 @@
 | 📢 **တစ်နာရီတစ်ခါ စာအုပ် အကြံပြုချက်** | တစ်နာရီတိုင်း ကွာကွာ စာအုပ်တစ်အုပ်စီ အလိုအလျောက် ပို့ပေးပါသည် (နောက်ထပ် ထပ်မတူအောင် tracking ပါ) |
 | 🎨 **Premium Emoji** | Telegram premium emoji များ သုံးနိုင်ပါသည် |
 | 🔎 **Inline Search** | @botusername ရိုက်ပြီး results ကြားမှ ရှာနိုင်ပါသည် |
+| 🔄 **Author Alias** | Pen name ရှာရင် စာရေးသူမှန် ပြန်ရှာပေးပါသည် |
 
 ## 🔍 ရှာဖွေနည်း Tips
 
@@ -61,6 +62,7 @@
 | `psychopath` | အင်္ဂလိပ်စာအုပ်များလည်း ရှာနိုင် |
 | `/ဂျူး` | / + စာရေးသူ/စာအုပ်နာမည် ရိုက်ရုံနဲ့ ရှာနိုင် |
 | `/searchဂျူး` | space မခြားဘဲလည်း ရှာနိုင် |
+| `/sဂျူး`, `/fဂျူး` | Short prefix နဲ့ ရှာနိုင် |
 
 > **💡 Tip:** စာအုပ်နာမည် ရိုက်ရင် space ခြားစရာ မလိုပါ — ဘာသာပြန်စာအုပ်တွေမှာ space ကွာထားတာကြောင့် flexible ဖြစ်အောင် လုပ်ထားပါသည်။
 
@@ -197,6 +199,8 @@ saroatsin-bot/
 ├── notes.py            # Book notes commands (addnote, note, mynote, delnote)
 ├── notes_db.py         # Notes storage via GitHub API
 ├── spam_db.py          # Custom spam domains storage via GitHub API
+├── keyword_db.py       # Blocked keywords storage via GitHub API
+├── alias_db.py         # Author alias storage via GitHub API
 ├── help_db.py          # Custom help items storage via GitHub API
 ├── requirements.txt    # Python dependencies
 ├── Dockerfile          # Railway deploy config
@@ -223,6 +227,8 @@ saroatsin-bot/
 
 | ရက်စွဲ | ပြောင်းလဲချက် |
 |---------|----------------|
+| 2026-07-24 | /addalias, /delalias, /aliaslist: Author alias system ထည့် |
+| 2026-07-24 | /s, /f short prefixes: /sဂျူး, /fဂျူး ရိုက်ရုံနဲ့ ရှာနိုင် |
 | 2026-07-24 | /searchဂျူး, /findဂျူး: space မခြားဘဲ ရှာနိုင် |
 | 2026-07-24 | Author Alias: /addalias, /delalias - pen name ရှာရင် စာရေးသူမှန် ပြန်ရှာပေး |
 | 2026-07-24 | Keyword Filter: /Addword, /Delword, /wordlist - block ထားသည့် စကားလုံး auto-delete |
