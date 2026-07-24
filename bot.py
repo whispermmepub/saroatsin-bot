@@ -827,7 +827,7 @@ async def cmd_authors(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not ctx.args:
-        sent = await update.message.reply_text("Format: /search စာအုပ်နာမည် သို့မဟုတ် စာရေးသူ")
+        sent = await update.message.reply_text("အသုံးပြုပုံ - /search စာအုပ်နာမည် (သို့) စာရေးသူ နာမည် နှင့်တွဲရေးပါ။\n\nဥပမာ - /search မင်းကျော်")
         asyncio.create_task(schedule_delete(sent))
         return
     query = " ".join(ctx.args)
