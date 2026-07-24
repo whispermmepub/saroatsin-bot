@@ -831,7 +831,7 @@ async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def on_burmese_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Handle /BurmeseText as a search command (e.g. /ဂျူး, /မြသန်းတင့်)."""
+    """Handle /BurmeseText or /searchBurmeseText as search (e.g. /ဂျူး, /searchဂျူး)."""
     if not update.message or not update.message.text:
         return
     text = update.message.text.strip()
@@ -842,20 +842,22 @@ async def on_burmese_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     cmd_name = cmd[1:]  # remove /
     if not cmd_name:
         return
-    # Check if it contains Burmese characters (Unicode 1000-109F, AA60-AA7F)
-    if not re.search(r'[က-႟ꩠ-ꩿ]', cmd_name):
-        return
     # Known commands to skip (already handled by CommandHandler)
     known = {"start","help","authors","search","add","del","refresh","testhourly",
              "stats","ban","unban","setwelcome","setgoodbye","addlink","dellink",
              "spamlist","addhelp","delhelp","addnote","note","mynote","delnote","find"}
     if cmd_name.lower() in known:
         return
-    # Use command name as search query (e.g. /ဂျူး -> search "ဂျူး")
-    query = cmd_name
-    if not query:
-        return
-    await _do_search(update, ctx, query)
+    # Case 1: /searchဂျူး or /findဂျူး (English prefix + Burmese)
+    for prefix in ("search", "find"):
+        if cmd_name.lower().startswith(prefix):
+            query = cmd_name[len(prefix):]
+            if query and re.search(r'[က-႟ꩠ-ꩿ]', query):
+                await _do_search(update, ctx, query)
+                return
+    # Case 2: /ဂျူး (pure Burmese command)
+    if re.search(r'[က-႟ꩠ-ꩿ]', cmd_name):
+        await _do_search(update, ctx, cmd_name)
 
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
