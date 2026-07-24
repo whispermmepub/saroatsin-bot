@@ -105,7 +105,7 @@ def remove_keyword(word):
     global _data_cache
     if _data_cache is None:
         _data_cache = {"keywords": []}
-    w = word.lower().strip()
+    w = word.lower().strip().replace(" ", "")
     if w in _data_cache["keywords"]:
         _data_cache["keywords"].remove(w)
         _save_to_github(_data_cache)
