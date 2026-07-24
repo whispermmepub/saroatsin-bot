@@ -849,7 +849,7 @@ async def on_burmese_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if cmd_name.lower() in known:
         return
     # Case 1: /searchဂျူး or /findဂျူး (English prefix + Burmese)
-    for prefix in ("search", "find"):
+    for prefix in ("search", "find", "s", "f"):
         if cmd_name.lower().startswith(prefix):
             query = cmd_name[len(prefix):]
             if query and re.search(r'[က-႟ꩠ-ꩿ]', query):
