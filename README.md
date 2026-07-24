@@ -42,6 +42,7 @@
 | 📝 **Book Notes** | စာဖတ်ပြီး note ရေးထားနိုင်ပါသည် |
 | 👋 **Welcome/Goodbye** | စိတ်ကြိုက် ကြိုဆို/နှုတ်ဆက်စာ သတ်မှတ်နိုင်ပါသည် |
 | 🛡️ **Spam Protection** | ခွင့်ပြုထားခြင်း မရှိသည့် link များကို Auto-delete လုပ်ပေးပါသည် |
+| 🚫 **Keyword Filter** | Block ထားသည့် စကားလုံးပါသည့် message များကို Auto-delete လုပ်ပေးပါသည် |
 | 🚫 **Auto Ban** | ထွက်သွားသူကို Auto-ban ပြုလုပ်ပေးပါသည် |
 | 🧹 **Auto Delete** | Bot messages များကို နာရီ ၁ အတွင်း Auto-delete လုပ်ပေးပါသည် |
 | 🌅 **မနက်/ည နှုတ်ဆက်စာ** | အလိုအလျောက် မနက်ခင်း/ညခင်း နှုတ်ဆက်စာ ပို့ပေးပါသည် |
@@ -98,6 +99,9 @@
 | `/addlink - domain` | Spam domain ထည့်ရန် |
 | `/dellink - domain` | Spam domain ဖျက်ရန် |
 | `/spamlist` | Blocked domains ကြည့်ရန် |
+| `/Addword စကားလုံး` | Keyword block ထည့်ရန် |
+| `/Delword စကားလုံး` | Keyword block ဖျက်ရန် |
+| `/wordlist` | Blocked keywords ကြည့်ရန် |
 | `/testhourly` | Hourly suggestion စမ်းရန် (Admin) |
 
 ## 👋 Welcome/Goodbye Message ပြင်နည်း
@@ -217,6 +221,7 @@ saroatsin-bot/
 | ရက်စွဲ | ပြောင်းလဲချက် |
 |---------|----------------|
 | 2026-07-24 | /searchဂျူး, /findဂျူး: space မခြားဘဲ ရှာနိုင် |
+| 2026-07-24 | Keyword Filter: /Addword, /Delword, /wordlist - block ထားသည့် စကားလုံး auto-delete |
 | 2026-07-24 | Inline Search: @botusername query ဖြင့် inline results ပြ |
 | 2026-07-24 | /find command: /search နဲ့ alias အဖြစ် ထည့် |
 | 2026-07-22 | /缅甸text search: /ဂျူး, /မြသန်းတင့် ရိုက်ရုံနဲ့ ရှာနိုင် |

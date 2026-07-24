@@ -35,6 +35,7 @@ from scraper import fetch_books, search_books, get_authors
 AUTO_DELETE_SECONDS = 3600
 from notes import cmd_addnote, cmd_note, cmd_mynote, cmd_delnote, handle_note_reply, notes_callback
 from spam_db import init_spam_db, add_spam_domain, remove_spam_domain, get_spam_domains
+from keyword_db import init_keyword_db, add_keyword, remove_keyword, get_keywords
 from help_db import init_help_db, add_help_item, remove_help_item, get_help_items
 
 # ── Config ──────────────────────────────────────────────
@@ -833,6 +834,61 @@ async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await _do_search(update, ctx, query)
 
 
+
+# ── Keyword Filter Commands ──────────────────────
+async def cmd_addword(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not ctx.args:
+        sent = await update.message.reply_text("Format: /Addword စကားလုံး")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    word = " ".join(ctx.args).strip()
+    if add_keyword(word):
+        sent = await update.message.reply_text(f"✅ '{word}' ကို block list ထဲ ထည့်ပြီးပါပြီ")
+    else:
+        sent = await update.message.reply_text(f"⚠️ '{word}' ရှိပြီးသားပါ")
+    asyncio.create_task(schedule_delete(sent))
+
+
+async def cmd_delword(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not ctx.args:
+        sent = await update.message.reply_text("Format: /Delword စကားလုံး")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    word = " ".join(ctx.args).strip()
+    if remove_keyword(word):
+        sent = await update.message.reply_text(f"✅ '{word}' ကို block list က ဖျက်ပြီးပါပြီ")
+    else:
+        sent = await update.message.reply_text(f"⚠️ '{word}' မတွေ့ပါ")
+    asyncio.create_task(schedule_delete(sent))
+
+
+async def cmd_wordlist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    words = get_keywords()
+    if not words:
+        sent = await update.message.reply_text("📭 Block list ထဲ ဘာမှ မရှိသေးပါ")
+    else:
+        text = f"🚫 *Blocked Keywords* — {len(words)} ခု\n"
+        text += "\n".join(f"{i}. {w}" for i, w in enumerate(words, 1))
+        sent = await update.message.reply_text(text, parse_mode="Markdown")
+    asyncio.create_task(schedule_delete(sent))
+
+
+async def keyword_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Auto-delete messages containing blocked keywords in groups."""
+    if not update.message or not update.message.text:
+        return
+    if update.effective_chat.type not in ("group", "supergroup"):
+        return
+    text = update.message.text.lower()
+    words = get_keywords()
+    for w in words:
+        if w in text:
+            try:
+                await update.message.delete()
+            except Exception:
+                pass
+            return
+
 async def on_inline_query(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Handle inline queries: @botusername query -> show book results."""
     query = update.inline_query.query.strip()
@@ -889,7 +945,7 @@ async def on_burmese_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # Known commands to skip (already handled by CommandHandler)
     known = {"start","help","authors","search","add","del","refresh","testhourly",
              "stats","ban","unban","setwelcome","setgoodbye","addlink","dellink",
-             "spamlist","addhelp","delhelp","addnote","note","mynote","delnote","find"}
+             "spamlist","addhelp","delhelp","addnote","note","mynote","delnote","find","addword","delword","wordlist"}
     if cmd_name.lower() in known:
         return
     # Case 1: /searchဂျူး or /findဂျူး (English prefix + Burmese)
@@ -1117,6 +1173,9 @@ async def post_init(application: Application):
             BotCommand("addlink", "Spam domain ထည့်ရန်"),
             BotCommand("dellink", "Spam domain ဖျက်ရန်"),
             BotCommand("spamlist", "Blocked domains ကြည့်ရန်"),
+            BotCommand("addword", "Keyword block ထည့်ရန်"),
+            BotCommand("delword", "Keyword block ဖျက်ရန်"),
+            BotCommand("wordlist", "Blocked keywords ကြည့်ရန်"),
         ]
         await application.bot.set_my_commands(commands)
         logger.info("Bot commands registered")
@@ -1135,6 +1194,7 @@ def main():
 
     load_books()
     init_spam_db()
+    init_keyword_db()
     init_help_db()
 
     app = (
@@ -1176,6 +1236,9 @@ def main():
     app.add_handler(CommandHandler("addlink", cmd_addlink))
     app.add_handler(CommandHandler("dellink", cmd_dellink))
     app.add_handler(CommandHandler("spamlist", cmd_spamlist))
+    app.add_handler(CommandHandler("addword", cmd_addword))
+    app.add_handler(CommandHandler("delword", cmd_delword))
+    app.add_handler(CommandHandler("wordlist", cmd_wordlist))
     app.add_handler(CommandHandler("addhelp", cmd_addhelp))
     app.add_handler(CommandHandler("delhelp", cmd_delhelp))
 
@@ -1199,6 +1262,7 @@ def main():
     app.add_handler(InlineQueryHandler(on_inline_query))
     app.add_handler(MessageHandler(filters.COMMAND & filters.TEXT, on_burmese_command))
 
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, keyword_filter), group=1)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, spam_filter), group=1)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text), group=2)
 
