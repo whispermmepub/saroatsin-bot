@@ -36,6 +36,7 @@ AUTO_DELETE_SECONDS = 3600
 from notes import cmd_addnote, cmd_note, cmd_mynote, cmd_delnote, handle_note_reply, notes_callback
 from spam_db import init_spam_db, add_spam_domain, remove_spam_domain, get_spam_domains
 from keyword_db import init_keyword_db, add_keyword, remove_keyword, get_keywords
+from alias_db import init_alias_db, add_alias, remove_alias, get_aliases, resolve_alias
 from help_db import init_help_db, add_help_item, remove_help_item, get_help_items
 
 # ── Config ──────────────────────────────────────────────
@@ -835,6 +836,49 @@ async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 
+
+# ── Author Alias Commands ──────────────────────
+async def cmd_addalias(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    text = " ".join(ctx.args) if ctx.args else ""
+    if " = " not in text:
+        sent = await update.message.reply_text("Format: /addalias alias = စာရေးသူနာမည်\nဥပမာ - /addalias မင်းကျော် = ကျော်လှိုင်ဦး")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    parts = text.split(" = ", 1)
+    alias = parts[0].strip()
+    canonical = parts[1].strip()
+    if add_alias(alias, canonical):
+        sent = await update.message.reply_text(f"✅ '{alias}' -> '{canonical}' alias ထည့်ပြီးပါပြီ")
+    else:
+        sent = await update.message.reply_text("❌ Format: /addalias alias = စာရေးသူနာမည်")
+    asyncio.create_task(schedule_delete(sent))
+
+
+async def cmd_delalias(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not ctx.args:
+        sent = await update.message.reply_text("Format: /delalias alias")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    alias = " ".join(ctx.args).strip()
+    if remove_alias(alias):
+        sent = await update.message.reply_text(f"✅ '{alias}' alias ဖျက်ပြီးပါပြီ")
+    else:
+        sent = await update.message.reply_text(f"⚠️ '{alias}' alias မတွေ့ပါ")
+    asyncio.create_task(schedule_delete(sent))
+
+
+async def cmd_aliaslist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    aliases = get_aliases()
+    if not aliases:
+        sent = await update.message.reply_text("📭 Alias များ မရှိသေးပါ")
+    else:
+        lines = [f"📝 *Author Aliases* — {len(aliases)} ခု\n"]
+        for alias, canonical in aliases.items():
+            lines.append(f"• {alias} -> {canonical}")
+        text = "\n".join(lines)
+        sent = await update.message.reply_text(text, parse_mode="Markdown")
+    asyncio.create_task(schedule_delete(sent))
+
 # ── Keyword Filter Commands ──────────────────────
 async def cmd_addword(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not ctx.args:
@@ -945,7 +989,7 @@ async def on_burmese_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # Known commands to skip (already handled by CommandHandler)
     known = {"start","help","authors","search","add","del","refresh","testhourly",
              "stats","ban","unban","setwelcome","setgoodbye","addlink","dellink",
-             "spamlist","addhelp","delhelp","addnote","note","mynote","delnote","find","addword","delword","wordlist"}
+             "spamlist","addhelp","delhelp","addnote","note","mynote","delnote","find","addword","delword","wordlist","addalias","delalias","aliaslist"}
     if cmd_name.lower() in known:
         return
     # Case 1: /searchဂျူး or /findဂျူး (English prefix + Burmese)
@@ -997,6 +1041,8 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def _do_search(update, ctx, query):
+    # Resolve author aliases
+    query, was_aliased = resolve_alias(query)
     if not BOOKS:
         return await update.message.reply_text("❌ စာအုပ်ဒေတာ မရှိသေးပါ။ /refresh ရိုက်ပါ")
     key = query.lower().strip()
@@ -1173,6 +1219,9 @@ async def post_init(application: Application):
             BotCommand("addlink", "Spam domain ထည့်ရန်"),
             BotCommand("dellink", "Spam domain ဖျက်ရန်"),
             BotCommand("spamlist", "Blocked domains ကြည့်ရန်"),
+            BotCommand("addalias", "Author alias ထည့်ရန်"),
+            BotCommand("delalias", "Author alias ဖျက်ရန်"),
+            BotCommand("aliaslist", "Aliases ကြည့်ရန်"),
             BotCommand("addword", "Keyword block ထည့်ရန်"),
             BotCommand("delword", "Keyword block ဖျက်ရန်"),
             BotCommand("wordlist", "Blocked keywords ကြည့်ရန်"),
@@ -1195,6 +1244,7 @@ def main():
     load_books()
     init_spam_db()
     init_keyword_db()
+    init_alias_db()
     init_help_db()
 
     app = (
@@ -1236,6 +1286,9 @@ def main():
     app.add_handler(CommandHandler("addlink", cmd_addlink))
     app.add_handler(CommandHandler("dellink", cmd_dellink))
     app.add_handler(CommandHandler("spamlist", cmd_spamlist))
+    app.add_handler(CommandHandler("addalias", cmd_addalias))
+    app.add_handler(CommandHandler("delalias", cmd_delalias))
+    app.add_handler(CommandHandler("aliaslist", cmd_aliaslist))
     app.add_handler(CommandHandler("addword", cmd_addword))
     app.add_handler(CommandHandler("delword", cmd_delword))
     app.add_handler(CommandHandler("wordlist", cmd_wordlist))

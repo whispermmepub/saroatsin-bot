@@ -99,6 +99,9 @@
 | `/addlink - domain` | Spam domain ထည့်ရန် |
 | `/dellink - domain` | Spam domain ဖျက်ရန် |
 | `/spamlist` | Blocked domains ကြည့်ရန် |
+| `/addalias alias = စာရေးသူ` | Author alias ထည့်ရန် |
+| `/delalias alias` | Author alias ဖျက်ရန် |
+| `/aliaslist` | Aliases ကြည့်ရန် |
 | `/Addword စကားလုံး` | Keyword block ထည့်ရန် |
 | `/Delword စကားလုံး` | Keyword block ဖျက်ရန် |
 | `/wordlist` | Blocked keywords ကြည့်ရန် |
@@ -221,6 +224,7 @@ saroatsin-bot/
 | ရက်စွဲ | ပြောင်းလဲချက် |
 |---------|----------------|
 | 2026-07-24 | /searchဂျူး, /findဂျူး: space မခြားဘဲ ရှာနိုင် |
+| 2026-07-24 | Author Alias: /addalias, /delalias - pen name ရှာရင် စာရေးသူမှန် ပြန်ရှာပေး |
 | 2026-07-24 | Keyword Filter: /Addword, /Delword, /wordlist - block ထားသည့် စကားလုံး auto-delete |
 | 2026-07-24 | Inline Search: @botusername query ဖြင့် inline results ပြ |
 | 2026-07-24 | /find command: /search နဲ့ alias အဖြစ် ထည့် |
