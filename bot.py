@@ -837,12 +837,24 @@ async def on_inline_query(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Handle inline queries: @botusername query -> show book results."""
     query = update.inline_query.query.strip()
     if not query:
+        try:
+            await update.inline_query.answer([], cache_time=300, is_personal=True)
+        except Exception:
+            pass
         return
-    results = search_books(BOOKS, query)
+    try:
+        results = search_books(BOOKS, query)
+    except Exception as e:
+        logger.error("Inline search error: %s", e)
+        results = []
     if not results:
+        try:
+            await update.inline_query.answer([], cache_time=300, is_personal=True)
+        except Exception:
+            pass
         return
     articles = []
-    for book in results[:20]:  # Telegram max 50, limit to 20
+    for book in results[:20]:
         title = book.get("title", "Unknown")
         author = book.get("author", "")
         link = book.get("link", "")
@@ -850,15 +862,17 @@ async def on_inline_query(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         articles.append(
             InlineQueryResultArticle(
                 id=str(hash(title + author)),
-                title=f"{title}",
+                title=title,
                 description=f"✍️ {author}",
                 input_message_content=InputTextMessageContent(
                     text, parse_mode="Markdown"
                 ),
-                thumb_url="https://img.shields.io/badge/📖-Book-e94560?style=flat-square",
             )
         )
-    await update.inline_query.answer(articles, cache_time=300, is_personal=True)
+    try:
+        await update.inline_query.answer(articles, cache_time=300, is_personal=True)
+    except Exception as e:
+        logger.error("Inline answer error: %s", e)
 
 async def on_burmese_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Handle /BurmeseText or /searchBurmeseText as search (e.g. /ဂျူး, /searchဂျူး)."""
