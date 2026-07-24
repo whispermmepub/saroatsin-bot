@@ -37,6 +37,7 @@ from notes import cmd_addnote, cmd_note, cmd_mynote, cmd_delnote, handle_note_re
 from spam_db import init_spam_db, add_spam_domain, remove_spam_domain, get_spam_domains
 from keyword_db import init_keyword_db, add_keyword, remove_keyword, get_keywords
 from alias_db import init_alias_db, add_alias, remove_alias, get_aliases, resolve_alias
+from whitelist_db import init_whitelist_db, add_to_whitelist, remove_from_whitelist, get_whitelist, is_domain_whitelisted, is_forward_allowed
 from help_db import init_help_db, add_help_item, remove_help_item, get_help_items
 
 # ── Config ──────────────────────────────────────────────
@@ -310,25 +311,41 @@ def is_url_allowed(url: str) -> bool:
 
 
 async def spam_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Auto-delete messages with non-allowed links in groups."""
-    if not update.message or not update.message.text:
+    """Auto-delete messages with non-whitelisted links + forwarded messages in groups."""
+    if not update.message:
         return
     chat = update.effective_chat
     if chat.type not in ("group", "supergroup"):
         return
+
+    # --- Forward filter: delete ALL forwards except whitelisted bots ---
+    if update.message.forward_from or update.message.forward_sender_name:
+        fwd_user = update.message.forward_from
+        if fwd_user and fwd_user.is_bot:
+            bot_name = fwd_user.username or ""
+            if is_forward_allowed(bot_name):
+                return  # Allow forwarded messages from whitelisted bots
+        try:
+            await update.message.delete()
+            logger.info("Forwarded message deleted in %s", chat.id)
+        except Exception as e:
+            logger.error("Failed to delete forward: %s", e)
+        return
+
+    # --- Link filter: delete ALL links except whitelisted ---
     text = update.message.text or ""
     urls = URL_RE.findall(text)
     if not urls:
         return
     for url in urls:
-        if is_url_allowed(url):
+        if is_domain_whitelisted(url):
             continue
-        logger.info("Spam detected in %s: %s", chat.id, url)
+        logger.info("Non-whitelisted link in %s: %s", chat.id, url)
         try:
             await update.message.delete()
-            logger.info("Spam deleted successfully")
+            logger.info("Non-whitelisted link deleted")
         except Exception as e:
-            logger.error("Failed to delete spam: %s", e)
+            logger.error("Failed to delete link: %s", e)
         return
 
 
@@ -533,15 +550,22 @@ async def cmd_dellink(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         sent = await update.message.reply_text("❌ Domain ထည့်ပါ")
         asyncio.create_task(schedule_delete(sent))
         return
-    if remove_spam_domain(domain):
+    removed_spam = remove_spam_domain(domain)
+    removed_wl = remove_from_whitelist(domain)
+    if removed_spam or removed_wl:
+        parts_msg = []
+        if removed_spam:
+            parts_msg.append(f"🔓 Blocked list က ဖျက်ပြီး")
+        if removed_wl:
+            parts_msg.append(f"❌ Whitelist က ဖျက်ပြီး")
         custom = get_spam_domains()
+        wl = get_whitelist()
         sent = await update.message.reply_text(
-            "✅ Blocked domain ဖျက်ပြီးပါပြီ!\n\n"
-            "🔓 " + domain + "\n\n"
-            "📊 Custom blocked: " + str(len(custom)) + " ခု"
+            f"✅ {domain} ဖျက်ပြီးပါပြီ!\n\n" + "\n".join(parts_msg) +
+            f"\n\n📊 Blocked: {len(custom)} | Whitelist: {len(wl)}"
         )
     else:
-        sent = await update.message.reply_text("❌ " + domain + " မတွေ့ပါ")
+        sent = await update.message.reply_text(f"❌ {domain} မတွေ့ပါ")
     asyncio.create_task(schedule_delete(sent))
 
 
@@ -693,7 +717,10 @@ async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/unban @username\n"
         "/addlink - domain\n"
         "/dellink - domain\n"
-        "/spamlist\n\n"
+        "/spamlist\n"
+        "/whitelist - domain\n"
+        "/delwhitelist - domain\n"
+        "/whitelistlist\n\n"
         "*\U0001f4e2 Auto Book Suggestion:*\n"
         "Every hour, a random book is\n"
         "automatically sent to groups.\n"
@@ -889,6 +916,64 @@ async def cmd_aliaslist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         sent = await update.message.reply_text(text, parse_mode="Markdown")
     asyncio.create_task(schedule_delete(sent))
 
+# ── Whitelist Commands ──────────────────────
+async def cmd_whitelist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        sent = await update.message.reply_text("❌ Admin သာ ထည့်ခွင့်ရှိပါတယ်")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    text = update.message.text.replace("/whitelist", "", 1).strip()
+    parts = text.split(" - ")
+    if len(parts) < 2:
+        sent = await update.message.reply_text("Format: /whitelist - www.example.com")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    domain = parts[1].strip().lower()
+    if not domain:
+        sent = await update.message.reply_text("❌ Domain ထည့်ပါ")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    if add_to_whitelist(domain):
+        wl = get_whitelist()
+        sent = await update.message.reply_text(f"✅ Whitelist ထဲ ထည့်ပြီးပါပြီ!\n\n✅ {domain}\n\n📊 Whitelist: {len(wl)} ခု")
+    else:
+        sent = await update.message.reply_text(f"⚠️ {domain} ရှိပြီးသားပါ")
+    asyncio.create_task(schedule_delete(sent))
+
+
+async def cmd_delwhitelist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        sent = await update.message.reply_text("❌ Admin သာ ဖျက်ခွင့်ရှိပါတယ်")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    text = update.message.text.replace("/delwhitelist", "", 1).strip()
+    parts = text.split(" - ")
+    if len(parts) < 2:
+        sent = await update.message.reply_text("Format: /delwhitelist - www.example.com")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    domain = parts[1].strip().lower()
+    if not domain:
+        sent = await update.message.reply_text("❌ Domain ထည့်ပါ")
+        asyncio.create_task(schedule_delete(sent))
+        return
+    if remove_from_whitelist(domain):
+        wl = get_whitelist()
+        sent = await update.message.reply_text(f"✅ Whitelist က ဖျက်ပြီးပါပြီ!\n\n❌ {domain}\n\n📊 Whitelist: {len(wl)} ခု")
+    else:
+        sent = await update.message.reply_text(f"❌ {domain} မတွေ့ပါ (default domain ဖြစ်နိုင်ပါတယ်)")
+    asyncio.create_task(schedule_delete(sent))
+
+
+async def cmd_whitelistlist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    wl = get_whitelist()
+    if not wl:
+        sent = await update.message.reply_text("📭 Whitelist ထဲ ဘာမှ မရှိသေးပါ")
+    else:
+        text = f"✅ *Whitelisted Domains* — {len(wl)} ခု\n\n" + "\n".join(f"• {d}" for d in wl)
+        sent = await update.message.reply_text(text, parse_mode="Markdown")
+    asyncio.create_task(schedule_delete(sent))
+
 # ── Keyword Filter Commands ──────────────────────
 async def cmd_addword(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not ctx.args:
@@ -1000,7 +1085,7 @@ async def on_burmese_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # Known commands to skip (already handled by CommandHandler)
     known = {"start","help","authors","search","add","del","refresh","testhourly",
              "stats","ban","unban","setwelcome","setgoodbye","addlink","dellink",
-             "spamlist","addhelp","delhelp","addnote","note","mynote","delnote","find","addword","delword","wordlist","addalias","delalias","aliaslist"}
+             "spamlist","addhelp","delhelp","addnote","note","mynote","delnote","find","addword","delword","wordlist","addalias","delalias","aliaslist","whitelist","delwhitelist","whitelistlist"}
     if cmd_name.lower() in known:
         return
     # Case 1: /searchဂျူး or /findဂျူး (English prefix + Burmese)
@@ -1228,6 +1313,9 @@ async def post_init(application: Application):
             BotCommand("mynote", "ကိုယ့် Note များ"),
             BotCommand("delnote", "Note ဖျက်ရန်"),
             BotCommand("addlink", "Spam domain ထည့်ရန်"),
+            BotCommand("whitelist", "Whitelist domain ထည့်ရန်"),
+            BotCommand("delwhitelist", "Whitelist domain ဖျက်ရန်"),
+            BotCommand("whitelistlist", "Whitelist ကြည့်ရန်"),
             BotCommand("dellink", "Spam domain ဖျက်ရန်"),
             BotCommand("spamlist", "Blocked domains ကြည့်ရန်"),
             BotCommand("addalias", "Author alias ထည့်ရန်"),
@@ -1256,6 +1344,7 @@ def main():
     init_spam_db()
     init_keyword_db()
     init_alias_db()
+    init_whitelist_db()
     init_help_db()
 
     app = (
@@ -1295,6 +1384,9 @@ def main():
 
     # Spam link management
     app.add_handler(CommandHandler("addlink", cmd_addlink))
+    app.add_handler(CommandHandler("whitelist", cmd_whitelist))
+    app.add_handler(CommandHandler("delwhitelist", cmd_delwhitelist))
+    app.add_handler(CommandHandler("whitelistlist", cmd_whitelistlist))
     app.add_handler(CommandHandler("dellink", cmd_dellink))
     app.add_handler(CommandHandler("spamlist", cmd_spamlist))
     app.add_handler(CommandHandler("addalias", cmd_addalias))

@@ -99,6 +99,9 @@
 | `/ban` | Ban ရန် (message reply) |
 | `/unban @username` | Unban ရန် |
 | `/addlink - domain` | Spam domain ထည့်ရန် |
+| `/whitelist - domain` | Whitelist domain ထည့်ရန် |
+| `/delwhitelist - domain` | Whitelist domain ဖျက်ရန် |
+| `/whitelistlist` | Whitelist ကြည့်ရန် |
 | `/dellink - domain` | Spam domain ဖျက်ရန် |
 | `/spamlist` | Blocked domains ကြည့်ရန် |
 | `/addalias alias = စာရေးသူ` | Author alias ထည့်ရန် |
@@ -201,21 +204,29 @@ saroatsin-bot/
 ├── spam_db.py          # Custom spam domains storage via GitHub API
 ├── keyword_db.py       # Blocked keywords storage via GitHub API
 ├── alias_db.py         # Author alias storage via GitHub API
+├── whitelist_db.py     # Whitelisted domains storage via GitHub API
 ├── help_db.py          # Custom help items storage via GitHub API
 ├── requirements.txt    # Python dependencies
 ├── Dockerfile          # Railway deploy config
 └── README.md           # This file
 ```
 
-## 🛡️ Spam Protection
+## 🛡️ Link & Forward Protection
 
-| Allowed (ခွင့်ပြု) | Blocked (ဖျက်) |
-|-------------------|----------------|
-| Facebook, YouTube | Google (Drive, Docs, Maps) |
-| Twitter/X, TikTok | Bit.ly, TinyURL |
-| Blogspot, Wikipedia | Porn sites |
-| saroatsin.com | t.me (ခွင့်ပြုထားခြင်းမရှိ) |
-| TheBookR, refthebook | Custom blocked domains |
+**Link Filter:** ခွင့်ပြုထားတဲ့ domain တွေကလွဲလို့ ကျန်တဲ့ link အားလုံးကို auto-delete လုပ်ပေးပါတယ်။
+
+**Forward Filter:** Group ထဲ forward လုပ်တာ မှန်သမျှ ဖျက်ပေးပါတယ်။ @wowepubsearch_bot နဲ့ @MissRose_bot ကလွဲလို့။
+
+| Whitelist (ခွင့်ပြု) | Command |
+|-------------------|---------|
+| Facebook, YouTube | Default ပါပြီး |
+| Twitter/X, TikTok | Default ပါပြီး |
+| Blogspot, Wikipedia | Default ပါပြီး |
+| saroatsin.com | Default ပါပြီး |
+| TheBookR, refthebook | Default ပါပြီး |
+| @wowepubsearch_bot | Forward ခွင့်ပြု |
+| @MissRose_bot | Forward ခွင့်ပြု |
+| Custom domains | `/whitelist` ဖြင့် ထည့် |
 
 ## 🚫 Auto Ban
 
@@ -227,6 +238,8 @@ saroatsin-bot/
 
 | ရက်စွဲ | ပြောင်းလဲချက် |
 |---------|----------------|
+| 2026-07-24 | Link & Forward Filter: whitelist-based link delete + forward delete |
+| 2026-07-24 | /whitelist, /delwhitelist, /whitelistlist: Whitelist management |
 | 2026-07-24 | /addalias, /delalias, /aliaslist: Author alias system ထည့် |
 | 2026-07-24 | /s, /f short prefixes: /sဂျူး, /fဂျူး ရိုက်ရုံနဲ့ ရှာနိုင် |
 | 2026-07-24 | /searchဂျူး, /findဂျူး: space မခြားဘဲ ရှာနိုင် |
