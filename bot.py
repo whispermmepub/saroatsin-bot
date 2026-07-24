@@ -934,9 +934,10 @@ async def keyword_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type not in ("group", "supergroup"):
         return
     text = update.message.text.lower()
+    text_nospace = text.replace(" ", "")
     words = get_keywords()
     for w in words:
-        if w in text:
+        if w in text or w in text_nospace:
             try:
                 await update.message.delete()
             except Exception:

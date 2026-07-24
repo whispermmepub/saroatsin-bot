@@ -93,7 +93,7 @@ def add_keyword(word):
     global _data_cache
     if _data_cache is None:
         _data_cache = {"keywords": []}
-    w = word.lower().strip()
+    w = word.lower().strip().replace(" ", "")
     if w and w not in _data_cache["keywords"]:
         _data_cache["keywords"].append(w)
         _save_to_github(_data_cache)
