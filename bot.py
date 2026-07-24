@@ -319,12 +319,24 @@ async def spam_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     # --- Forward filter: delete ALL forwards except whitelisted bots ---
-    if update.message.forward_from or update.message.forward_sender_name:
+    is_forwarded = (
+        update.message.forward_from
+        or update.message.forward_sender_name
+        or update.message.forward_from_chat
+        or update.message.forward_origin
+    )
+    if is_forwarded:
         fwd_user = update.message.forward_from
         if fwd_user and fwd_user.is_bot:
             bot_name = fwd_user.username or ""
             if is_forward_allowed(bot_name):
                 return  # Allow forwarded messages from whitelisted bots
+        # Also allow whitelisted bots via channel forward
+        fwd_chat = update.message.forward_from_chat
+        if fwd_chat and fwd_chat.type == "channel":
+            chat_name = fwd_chat.username or ""
+            if is_forward_allowed(chat_name):
+                return
         try:
             await update.message.delete()
             logger.info("Forwarded message deleted in %s", chat.id)
