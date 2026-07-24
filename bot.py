@@ -16,6 +16,8 @@ from telegram import (
     InlineKeyboardMarkup,
     BotCommand,
     MessageEntity,
+    InlineQueryResultArticle,
+    InputTextMessageContent,
 )
 from telegram.ext import (
     Application,
@@ -23,6 +25,7 @@ from telegram.ext import (
     MessageHandler,
     CallbackQueryHandler,
     ChatMemberHandler,
+    InlineQueryHandler,
     ContextTypes,
     filters,
 )
@@ -830,6 +833,33 @@ async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await _do_search(update, ctx, query)
 
 
+async def on_inline_query(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Handle inline queries: @botusername query -> show book results."""
+    query = update.inline_query.query.strip()
+    if not query:
+        return
+    results = search_books(BOOKS, query)
+    if not results:
+        return
+    articles = []
+    for book in results[:20]:  # Telegram max 50, limit to 20
+        title = book.get("title", "Unknown")
+        author = book.get("author", "")
+        link = book.get("link", "")
+        text = f"📖 *{title}*\n✍️ {author}\n\n🔗 {link}"
+        articles.append(
+            InlineQueryResultArticle(
+                id=str(hash(title + author)),
+                title=f"{title}",
+                description=f"✍️ {author}",
+                input_message_content=InputTextMessageContent(
+                    text, parse_mode="Markdown"
+                ),
+                thumb_url="https://img.shields.io/badge/📖-Book-e94560?style=flat-square",
+            )
+        )
+    await update.inline_query.answer(articles, cache_time=300, is_personal=True)
+
 async def on_burmese_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Handle /BurmeseText or /searchBurmeseText as search (e.g. /ဂျူး, /searchဂျူး)."""
     if not update.message or not update.message.text:
@@ -1152,6 +1182,7 @@ def main():
     app.add_handler(CallbackQueryHandler(callback_handler, pattern=r"^(r\||a\|)"))
 
     # Burmese command search: /ဂျူး, /မြသန်းတင့် etc.
+    app.add_handler(InlineQueryHandler(on_inline_query))
     app.add_handler(MessageHandler(filters.COMMAND & filters.TEXT, on_burmese_command))
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, spam_filter), group=1)
