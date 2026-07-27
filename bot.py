@@ -1096,6 +1096,10 @@ async def on_burmese_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Handle /BurmeseText or /searchBurmeseText as search (e.g. /ဂျူး, /searchဂျူး)."""
     if not update.message or not update.message.text:
         return
+    # Skip forwarded messages - let forward_filter in group=1 handle them
+    if (update.message.forward_from or update.message.forward_sender_name
+            or update.message.forward_from_chat or update.message.forward_origin):
+        return
     text = update.message.text.strip()
     # Remove leading / and take the command part
     cmd = text.split()[0] if text.split() else ""
@@ -1123,6 +1127,10 @@ async def on_burmese_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
+        return
+    # Skip forwarded messages - let forward_filter in group=1 handle them
+    if (update.message.forward_from or update.message.forward_sender_name
+            or update.message.forward_from_chat or update.message.forward_origin):
         return
     # Handle pending note reply
     if NOTES_ENABLED and "pending_note" in ctx.user_data:
