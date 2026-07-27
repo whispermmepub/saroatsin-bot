@@ -339,7 +339,8 @@ async def forward_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.delete()
         logger.info("Forwarded message deleted in %s", chat.id)
     except Exception as e:
-        logger.error("Failed to delete forward: %s", e)
+        logger.error("Failed to delete forward in %s (chat_type=%s): %s", chat.id, chat.type, e)
+        logger.error("Bot must be admin with Delete Messages permission! Forward check: forward_from=%s, forward_from_chat=%s, forward_origin=%s", bool(update.message.forward_from), bool(update.message.forward_from_chat), type(update.message.forward_origin).__name__ if update.message.forward_origin else None)
 
 
 async def spam_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
