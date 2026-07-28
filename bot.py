@@ -372,18 +372,23 @@ async def spam_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if chat.type not in ("group", "supergroup"):
         return
     text = update.message.text or ""
+    logger.info("[SPAM_FILTER] Message in %s (%s): %s", chat.id, chat.type, text[:100])
     urls = URL_RE.findall(text)
     if not urls:
+        logger.info("[SPAM_FILTER] No URLs found, skipping")
         return
+    logger.info("[SPAM_FILTER] Found URLs: %s", urls)
     for url in urls:
-        if is_url_allowed(url):
+        allowed = is_url_allowed(url)
+        logger.info("[SPAM_FILTER] URL=%s allowed=%s", url, allowed)
+        if allowed:
             continue
-        logger.info("Blocked link in %s: %s", chat.id, url)
+        logger.info("[SPAM_FILTER] BLOCKED link in %s: %s", chat.id, url)
         try:
             await update.message.delete()
-            logger.info("Blocked link deleted")
+            logger.info("[SPAM_FILTER] Successfully deleted message %s", update.message.message_id)
         except Exception as e:
-            logger.error("Failed to delete link: %s", e)
+            logger.error("[SPAM_FILTER] FAILED to delete: %s (chat=%s, msg=%s)", e, chat.id, update.message.message_id)
         return
 
 
