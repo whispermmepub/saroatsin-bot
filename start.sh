@@ -1,4 +1,4 @@
 #!/bin/bash
 echo "📖 Saroatsin Bot Starting..."
-export TELEGRAM_BOT_TOKEN="8644464116:AAGQqzYiRGhTcpOit47AAJW845sBfCSZiX8"
+# Bot token should be set via environment variable TELEGRAM_BOT_TOKEN
 python3 bot.py

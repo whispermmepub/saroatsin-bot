@@ -60,36 +60,45 @@ def _load_from_github():
 
 def _save_to_github(data):
     global _data_sha
-    token = os.environ.get("GITHUB_TOKEN", "")
+    token = os.environ.get('GITHUB_TOKEN', '')
     if not token:
-        logger.warning("No GITHUB_TOKEN, notes not saved")
+        logger.warning('No GITHUB_TOKEN, data not saved to GitHub')
         return False
-    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{NOTES_PATH}"
+    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/notes_data.json"
     headers = {
-        "Authorization": f"token {token}",
-        "Accept": "application/vnd.github.v3+json",
+        'Authorization': f'token {token}',
+        'Accept': 'application/vnd.github.v3+json',
     }
-    try:
-        content = json.dumps(data, ensure_ascii=False, indent=2)
-        payload = {
-            "message": "Update notes via bot",
-            "content": base64.b64encode(content.encode("utf-8")).decode("utf-8"),
-        }
-        if _data_sha:
-            payload["sha"] = _data_sha
-        req = urllib.request.Request(
-            api_url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers=headers,
-            method="PUT",
-        )
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
-            _data_sha = result.get("content", {}).get("sha", _data_sha)
-            return True
-    except Exception as e:
-        logger.error("Failed to save notes: %s", e)
-        return False
+    for attempt in range(3):
+        try:
+            if attempt > 0:
+                req = urllib.request.Request(api_url, headers=headers)
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    current = json.loads(resp.read().decode('utf-8'))
+                    _data_sha = current.get('sha', '')
+            content_bytes = json.dumps(data, ensure_ascii=False, indent=2)
+            payload = {
+                "message": "Update notes via bot",
+                'content': base64.b64encode(content_bytes.encode('utf-8')).decode('utf-8'),
+            }
+            if _data_sha:
+                payload["sha"] = _data_sha
+            req = urllib.request.Request(
+                api_url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers=headers,
+                method='PUT',
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                result = json.loads(resp.read().decode('utf-8'))
+                _data_sha = result.get("content", {}).get("sha", _data_sha)
+                return True
+        except Exception as e:
+            logger.warning("GitHub save attempt %d/3 failed for notes: %s", attempt + 1, e)
+            if attempt < 2:
+                time.sleep(1)
+    logger.error("All 3 attempts to save notes failed")
+    return False
 
 
 def add_note(user_id, username, book_title, rating, note_text):

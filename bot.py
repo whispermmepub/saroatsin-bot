@@ -46,7 +46,7 @@ DATA_URL = "https://raw.githubusercontent.com/whispermmepub/wow-books/main/data.
 GITHUB_REPO = "whispermmepub/wow-books"
 DATA_PATH = "data.json"
 RESULTS_PER_PAGE = 10
-ADMIN_USERNAMES = ["wowepub"]
+ADMIN_IDS = [7930855703]  # Replace with your Telegram user ID
 NOTES_ENABLED = True
 
 logging.basicConfig(
@@ -54,6 +54,15 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
+
+def escape_md(text):
+    """Escape Markdown v1 special characters for safe Telegram formatting."""
+    chars = ['*', '_', '`', '[']
+    result = str(text)
+    for ch in chars:
+        result = result.replace(ch, '\\' + ch)
+    return result
+
 
 # ── Globals ─────────────────────────────────────────────
 BOOKS = []
@@ -71,7 +80,6 @@ GOOD_NIGHT = "🌙 ညချမ်းပါ! စာအုပ်ကောင်�
 GOODBYE_MSG = "👋 {name} ထွက်သွားပါပြီ"
 WELCOME_ENTITIES = []
 GOODBYE_ENTITIES = []
-GOODBYE_MSG = "👋 {name} ထွက်သွားပါပြီ"
 
 
 def load_books():
@@ -150,7 +158,25 @@ def push_to_github(data, message="Update data.json via Telegram bot"):
 
 def is_admin(update):
     user = update.effective_user
-    return user.username in ADMIN_USERNAMES
+    return user and user.id in ADMIN_IDS
+
+
+def _parse_dash_arg(text, command):
+    """Parse 'command - value' or 'command — value' flexibly."""
+    text = text.replace(command, "", 1).strip()
+    # Normalize all dash types to simple " - "
+    for ch in ["—", "–", "‒", "‐"]:  # em-dash, en-dash, figure dash, hyphen
+        text = text.replace(ch, "-")
+    # Try delimiters after normalization
+    for delim in [" - ", "- "]:
+        if delim in text:
+            parts = text.split(delim, 1)
+            return parts[1].strip() if len(parts) > 1 else ""
+    # Try leading dash without space
+    if text.startswith("-"):
+        return text.lstrip("-").strip()
+    # No delimiter found - just take the rest
+    return text.strip()
 
 def _adjust_entities(original_text, new_text, original_entities, old_sub, new_sub):
     if not original_entities:
@@ -260,14 +286,9 @@ async def on_left_member(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 # ── Spam Protection ──────────────────────────────────────
-ALLOWED_DOMAINS = [
-    "facebook.com", "fb.com", "fb.watch",
-    "youtube.com", "youtu.be",
-    "twitter.com", "x.com",
-    "tiktok.com",
-    "blogspot.com", "whispermmepub.github.io", "saroatsin.com",
-    "wikipedia.org",
-]
+# Default allowed domains are managed via whitelist_db.py
+# Use /whitelist - domain to add, /delwhitelist - domain to remove
+# Built-in defaults: facebook, youtube, twitter/x, tiktok, blogspot, wikipedia, saroatsin, whispermmepub
 
 ALLOWED_TG_CHANNELS = ["TheBookR", "refthebook"]
 
@@ -287,8 +308,8 @@ def is_url_allowed(url: str) -> bool:
     host = (parsed.hostname or "").lower()
     path = parsed.path.lower()
 
-    # Allowed domains
-    if any(d in host for d in ALLOWED_DOMAINS):
+    # Check dynamic whitelist first
+    if is_domain_whitelisted(url):
         return True
 
     # Allowed Telegram channels
@@ -355,12 +376,12 @@ async def spam_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not urls:
         return
     for url in urls:
-        if is_domain_whitelisted(url):
+        if is_url_allowed(url):
             continue
-        logger.info("Non-whitelisted link in %s: %s", chat.id, url)
+        logger.info("Blocked link in %s: %s", chat.id, url)
         try:
             await update.message.delete()
-            logger.info("Non-whitelisted link deleted")
+            logger.info("Blocked link deleted")
         except Exception as e:
             logger.error("Failed to delete link: %s", e)
         return
@@ -478,11 +499,14 @@ async def cmd_addhelp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         asyncio.create_task(schedule_delete(sent))
         return
     text = update.message.text.replace("/addhelp", "", 1).strip()
-    parts = text.split(" - ")
-    if len(parts) < 2:
+    if " - " not in text and " – " not in text:
         sent = await update.message.reply_text("Format: /addhelp command - description")
         asyncio.create_task(schedule_delete(sent))
         return
+    for delim in [" - ", " – "]:
+        if delim in text:
+            parts = text.split(delim, 1)
+            break
     command = parts[0].strip()
     description = parts[1].strip()
     if not command or not description:
@@ -528,13 +552,12 @@ async def cmd_addlink(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         sent = await update.message.reply_text("❌ Admin သာ ထည့်ခွင့်ရှိပါတယ်")
         asyncio.create_task(schedule_delete(sent))
         return
-    text = update.message.text.replace("/addlink", "", 1).strip()
-    parts = text.split(" - ")
-    if len(parts) < 2:
+    domain = _parse_dash_arg(update.message.text, "/addlink")
+    if not domain:
         sent = await update.message.reply_text("Format: /addlink - www.example.com")
         asyncio.create_task(schedule_delete(sent))
         return
-    domain = parts[1].strip().lower()
+    domain = domain.lower()
     if not domain:
         sent = await update.message.reply_text("❌ Domain ထည့်ပါ")
         asyncio.create_task(schedule_delete(sent))
@@ -556,13 +579,12 @@ async def cmd_dellink(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         sent = await update.message.reply_text("❌ Admin သာ ဖျက်ခွင့်ရှိပါတယ်")
         asyncio.create_task(schedule_delete(sent))
         return
-    text = update.message.text.replace("/dellink", "", 1).strip()
-    parts = text.split(" - ")
-    if len(parts) < 2:
+    domain = _parse_dash_arg(update.message.text, "/dellink")
+    if not domain:
         sent = await update.message.reply_text("Format: /dellink - www.example.com")
         asyncio.create_task(schedule_delete(sent))
         return
-    domain = parts[1].strip().lower()
+    domain = domain.lower()
     if not domain:
         sent = await update.message.reply_text("❌ Domain ထည့်ပါ")
         asyncio.create_task(schedule_delete(sent))
@@ -644,6 +666,11 @@ async def hourly_book_suggestion(ctx: ContextTypes.DEFAULT_TYPE):
     author = book.get("author", "")
     link = book.get("link", "")
     RECENTLY_SENT.add(f"{author}-{title}")
+    if len(RECENTLY_SENT) > 200:
+        # Keep only the last 100 entries
+        items = list(RECENTLY_SENT)
+        RECENTLY_SENT.clear()
+        RECENTLY_SENT.update(items[-100:])
     
     text = (
         "📖 ဒီနေ့အတွက် ဖတ်စရာ\n\n"
@@ -770,7 +797,12 @@ async def cmd_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         return
     text = update.message.text.replace("/add", "", 1).strip()
-    parts = text.split(" - ")
+    for delim in [" - ", " – "]:
+        if delim in text:
+            parts = text.split(delim, 2)
+            break
+    else:
+        parts = []
     if len(parts) < 3:
         await update.message.reply_text("❌ Format: /add စာရေးသူ - စာအုပ် - link")
         return
@@ -813,7 +845,12 @@ async def cmd_del(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Admin သာ ဖျက်ခွင့်ရှိပါတယ်")
         return
     text = update.message.text.replace("/del", "", 1).strip()
-    parts = text.split(" - ")
+    for delim in [" - ", " – "]:
+        if delim in text:
+            parts = text.split(delim, 2)
+            break
+    else:
+        parts = []
     if len(parts) < 3:
         await update.message.reply_text("❌ Format: /del စာရေးသူ - စာအုပ် - link")
         return
@@ -899,6 +936,10 @@ async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── Author Alias Commands ──────────────────────
 async def cmd_addalias(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        sent = await update.message.reply_text("❌ Admin သာ ထည့်ခွင့်ရှိပါတယ်")
+        asyncio.create_task(schedule_delete(sent))
+        return
     text = " ".join(ctx.args) if ctx.args else ""
     if " = " not in text:
         sent = await update.message.reply_text("Format: /addalias alias = စာရေးသူနာမည်\nဥပမာ - /addalias မင်းကျော် = ကျော်လှိုင်ဦး")
@@ -915,6 +956,10 @@ async def cmd_addalias(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_delalias(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        sent = await update.message.reply_text("❌ Admin သာ ဖျက်ခွင့်ရှိပါတယ်")
+        asyncio.create_task(schedule_delete(sent))
+        return
     if not ctx.args:
         sent = await update.message.reply_text("Format: /delalias alias")
         asyncio.create_task(schedule_delete(sent))
@@ -945,13 +990,12 @@ async def cmd_whitelist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         sent = await update.message.reply_text("❌ Admin သာ ထည့်ခွင့်ရှိပါတယ်")
         asyncio.create_task(schedule_delete(sent))
         return
-    text = update.message.text.replace("/whitelist", "", 1).strip()
-    parts = text.split(" - ")
-    if len(parts) < 2:
+    domain = _parse_dash_arg(update.message.text, "/whitelist")
+    if not domain:
         sent = await update.message.reply_text("Format: /whitelist - www.example.com")
         asyncio.create_task(schedule_delete(sent))
         return
-    domain = parts[1].strip().lower()
+    domain = domain.lower()
     if not domain:
         sent = await update.message.reply_text("❌ Domain ထည့်ပါ")
         asyncio.create_task(schedule_delete(sent))
@@ -969,13 +1013,12 @@ async def cmd_delwhitelist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         sent = await update.message.reply_text("❌ Admin သာ ဖျက်ခွင့်ရှိပါတယ်")
         asyncio.create_task(schedule_delete(sent))
         return
-    text = update.message.text.replace("/delwhitelist", "", 1).strip()
-    parts = text.split(" - ")
-    if len(parts) < 2:
+    domain = _parse_dash_arg(update.message.text, "/delwhitelist")
+    if not domain:
         sent = await update.message.reply_text("Format: /delwhitelist - www.example.com")
         asyncio.create_task(schedule_delete(sent))
         return
-    domain = parts[1].strip().lower()
+    domain = domain.lower()
     if not domain:
         sent = await update.message.reply_text("❌ Domain ထည့်ပါ")
         asyncio.create_task(schedule_delete(sent))
@@ -999,6 +1042,10 @@ async def cmd_whitelistlist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── Keyword Filter Commands ──────────────────────
 async def cmd_addword(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        sent = await update.message.reply_text("❌ Admin သာ ထည့်ခွင့်ရှိပါတယ်")
+        asyncio.create_task(schedule_delete(sent))
+        return
     if not ctx.args:
         sent = await update.message.reply_text("Format: /Addword စကားလုံး")
         asyncio.create_task(schedule_delete(sent))
@@ -1012,6 +1059,10 @@ async def cmd_addword(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_delword(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        sent = await update.message.reply_text("❌ Admin သာ ဖျက်ခွင့်ရှိပါတယ်")
+        asyncio.create_task(schedule_delete(sent))
+        return
     if not ctx.args:
         sent = await update.message.reply_text("Format: /Delword စကားလုံး")
         asyncio.create_task(schedule_delete(sent))
@@ -1045,7 +1096,8 @@ async def keyword_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text_nospace = text.replace(" ", "")
     words = get_keywords()
     for w in words:
-        if w in text or w in text_nospace:
+        wl = w.lower()
+        if wl in text or wl in text_nospace:
             try:
                 await update.message.delete()
             except Exception:
@@ -1077,7 +1129,7 @@ async def on_inline_query(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         title = book.get("title", "Unknown")
         author = book.get("author", "")
         link = book.get("link", "")
-        text = f"📖 *{title}*\n✍️ {author}\n\n🔗 {link}"
+        text = f"📖 *{escape_md(title)}*\n✍️ {escape_md(author)}\n\n🔗 {link}"
         articles.append(
             InlineQueryResultArticle(
                 id=str(hash(title + author)),
@@ -1180,7 +1232,7 @@ async def _do_search(update, ctx, query):
         results = search_books(BOOKS, query)
     if not results:
         await update.message.reply_text(
-            f"❌ \"{query}\" နှင့် ကိုက်ညီသော စာအုပ် မတွေ့ပါ။"
+            f"❌ \"{escape_md(query)}\" နှင့် ကိုက်ညီသော စာအုပ် မတွေ့ပါ။"
         )
         return
     page = 0
@@ -1188,6 +1240,11 @@ async def _do_search(update, ctx, query):
     cb_key = str(len([k for k in (ctx.bot_data.get("search_keys") or {}) if not k.startswith("_")]))
     if ctx.bot_data.get("search_keys") is None:
         ctx.bot_data["search_keys"] = {}
+    # Limit search cache to 50 entries to prevent memory leak
+    if len(ctx.bot_data["search_keys"]) > 50:
+        oldest_keys = list(ctx.bot_data["search_keys"].keys())[:25]
+        for k in oldest_keys:
+            ctx.bot_data["search_keys"].pop(k, None)
     ctx.bot_data["search_keys"][cb_key] = {"q": query, "r": results if len(results) <= 200 else results[:200]}
     # Also store reverse mapping: query -> cb_key for fallback
     if ctx.bot_data.get("query_to_key") is None:
@@ -1211,9 +1268,9 @@ def _results_page(results, query, page, cb_key=""):
     end = min(start + RESULTS_PER_PAGE, total)
     page_items = results[start:end]
     total_pages = (total + RESULTS_PER_PAGE - 1) // RESULTS_PER_PAGE
-    lines = [f"🔍 *{query}* — {total} စာအုပ်တွေ့ပါသည်\n"]
+    lines = [f"🔍 *{escape_md(query)}* — {total} စာအုပ်တွေ့ပါသည်\n"]
     for i, b in enumerate(page_items, start=start + 1):
-        lines.append(f"{i}. {b['title']}")
+        lines.append(f"{i}. {escape_md(b['title'])}")
     text = "\n".join(lines)
     buttons = []
     for b in page_items:
@@ -1237,7 +1294,7 @@ def _author_page(authors, page):
     total_pages = (total + RESULTS_PER_PAGE - 1) // RESULTS_PER_PAGE
     lines = [f"✍️ *စာရေးသူများ* — {total} ဦး\n"]
     for name, count in page_items:
-        lines.append(f"• {name} ({count})")
+        lines.append(f"• {escape_md(name)} ({count})")
     text = "\n".join(lines)
     buttons = []
     nav = []
@@ -1318,7 +1375,7 @@ async def post_init(application: Application):
         if job_queue:
             job_queue.run_daily(good_morning, time=dt_time(hour=7, minute=0, tzinfo=MYANMAR_TZ))
             job_queue.run_daily(good_night, time=dt_time(hour=21, minute=0, tzinfo=MYANMAR_TZ))
-            job_queue.run_repeating(hourly_book_suggestion, interval=3600, first=3600)
+            job_queue.run_repeating(hourly_book_suggestion, interval=18000, first=18000)
             logger.info("Scheduled messages set up")
         else:
             logger.warning("Job queue not available, scheduled messages disabled")
