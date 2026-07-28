@@ -372,23 +372,17 @@ async def spam_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if chat.type not in ("group", "supergroup"):
         return
     text = update.message.text or ""
-    logger.info("[SPAM_FILTER] Message in %s (%s): %s", chat.id, chat.type, text[:100])
     urls = URL_RE.findall(text)
     if not urls:
-        logger.info("[SPAM_FILTER] No URLs found, skipping")
         return
-    logger.info("[SPAM_FILTER] Found URLs: %s", urls)
     for url in urls:
-        allowed = is_url_allowed(url)
-        logger.info("[SPAM_FILTER] URL=%s allowed=%s", url, allowed)
-        if allowed:
+        if is_url_allowed(url):
             continue
-        logger.info("[SPAM_FILTER] BLOCKED link in %s: %s", chat.id, url)
+        logger.info("Blocked link in %s: %s", chat.id, url)
         try:
             await update.message.delete()
-            logger.info("[SPAM_FILTER] Successfully deleted message %s", update.message.message_id)
         except Exception as e:
-            logger.error("[SPAM_FILTER] FAILED to delete: %s (chat=%s, msg=%s)", e, chat.id, update.message.message_id)
+            logger.error("Failed to delete link: %s", e)
         return
 
 
@@ -1100,18 +1094,14 @@ async def keyword_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
     text_nospace = text.replace(" ", "")
     words = get_keywords()
-    logger.info("[KW_FILTER] Message in %s: %s | Keywords: %s", update.effective_chat.id, text[:80], words)
     for w in words:
         wl = w.lower()
         if wl in text or wl in text_nospace:
-            logger.info("[KW_FILTER] MATCH keyword=%s in msg, deleting", wl)
             try:
                 await update.message.delete()
-                logger.info("[KW_FILTER] Deleted message %s", update.message.message_id)
-            except Exception as e:
-                logger.error("[KW_FILTER] FAILED to delete: %s", e)
+            except Exception:
+                pass
             return
-    logger.info("[KW_FILTER] No keyword match")
 
 async def on_inline_query(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Handle inline queries: @botusername query -> show book results."""
