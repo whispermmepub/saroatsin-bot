@@ -1100,14 +1100,18 @@ async def keyword_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
     text_nospace = text.replace(" ", "")
     words = get_keywords()
+    logger.info("[KW_FILTER] Message in %s: %s | Keywords: %s", update.effective_chat.id, text[:80], words)
     for w in words:
         wl = w.lower()
         if wl in text or wl in text_nospace:
+            logger.info("[KW_FILTER] MATCH keyword=%s in msg, deleting", wl)
             try:
                 await update.message.delete()
-            except Exception:
-                pass
+                logger.info("[KW_FILTER] Deleted message %s", update.message.message_id)
+            except Exception as e:
+                logger.error("[KW_FILTER] FAILED to delete: %s", e)
             return
+    logger.info("[KW_FILTER] No keyword match")
 
 async def on_inline_query(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Handle inline queries: @botusername query -> show book results."""
