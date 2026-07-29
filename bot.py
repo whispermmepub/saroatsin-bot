@@ -1225,6 +1225,21 @@ async def on_burmese_command(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if re.search(r'[က-႟ꩠ-ꩿ]', cmd_name):
         await _do_search(update, ctx, cmd_name)
 
+async def on_private_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Handle private chat text: direct search without /search prefix."""
+    if not update.message or not update.message.text:
+        return
+    # Handle pending note reply
+    if NOTES_ENABLED and "pending_note" in ctx.user_data:
+        handled = await handle_note_reply(update, ctx)
+        if handled:
+            return
+    query = update.message.text.strip()
+    if not query:
+        return
+    await _do_search(update, ctx, query)
+
+
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -1548,6 +1563,9 @@ def main():
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND & filters.ChatType.GROUPS, forward_filter), group=1)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, keyword_filter), group=1)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, spam_filter), group=1)
+    # Private chat: any text message triggers book search (no /search prefix needed)
+    # on_private_text matches private chats first; on_text handles groups
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, on_private_text), group=2)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text), group=2)
 
     logger.info("Bot is starting...")
