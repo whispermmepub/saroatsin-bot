@@ -84,20 +84,52 @@ GOODBYE_ENTITIES = []
 
 def load_books():
     global BOOKS, BOOKS_BY_AUTHOR, RAW_DATA
-    logger.info("Fetching books from %s ...", DATA_URL)
-    try:
-        books, raw = fetch_books(DATA_URL)
-        BOOKS = books
-        RAW_DATA = raw
-        logger.info("Loaded %d books from %d authors.", len(BOOKS), len({b["author"] for b in BOOKS}))
-        BOOKS_BY_AUTHOR = {}
-        for b in BOOKS:
-            key = b["author"].lower()
-            BOOKS_BY_AUTHOR.setdefault(key, []).append(b)
-    except Exception as e:
-        logger.error("Failed to load books: %s", e)
-        if not BOOKS:
-            logger.warning("No books loaded, using empty list")
+    # Try GitHub API first (no CDN cache), fall back to raw URL
+    token = os.environ.get("GITHUB_TOKEN", "")
+    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{DATA_PATH}"
+    loaded = False
+    if token:
+        try:
+            import base64
+            headers = {
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github.v3+json",
+            }
+            req = urllib.request.Request(api_url, headers=headers)
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+                raw_content = base64.b64decode(result["content"]).decode("utf-8")
+                raw = json.loads(raw_content)
+            books = []
+            for author_entry in raw:
+                author = author_entry.get("author", "")
+                for book in author_entry.get("books", []):
+                    books.append({
+                        "author": author,
+                        "title": book.get("title", ""),
+                        "link": book.get("link", ""),
+                    })
+            BOOKS = books
+            RAW_DATA = raw
+            loaded = True
+            logger.info("Loaded %d books from %d authors (via GitHub API).", len(BOOKS), len({b["author"] for b in BOOKS}))
+        except Exception as e:
+            logger.warning("GitHub API fetch failed, falling back to raw URL: %s", e)
+    if not loaded:
+        logger.info("Fetching books from %s ...", DATA_URL)
+        try:
+            books, raw = fetch_books(DATA_URL)
+            BOOKS = books
+            RAW_DATA = raw
+            logger.info("Loaded %d books from %d authors (via raw URL).", len(BOOKS), len({b["author"] for b in BOOKS}))
+        except Exception as e:
+            logger.error("Failed to load books: %s", e)
+            if not BOOKS:
+                logger.warning("No books loaded, using empty list")
+    BOOKS_BY_AUTHOR = {}
+    for b in BOOKS:
+        key = b["author"].lower()
+        BOOKS_BY_AUTHOR.setdefault(key, []).append(b)
 
 
 def rebuild_books():
@@ -836,33 +868,72 @@ async def cmd_del(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not author or not title or not link:
         await update.message.reply_text("❌ အကုန်ဖြည့်ပါ")
         return
+    # Reload from GitHub API to ensure fresh data (avoids stale CDN cache)
+    load_books()
     found = False
+    deleted_book = None
+    matched_no_link = []
     for entry in RAW_DATA:
         if entry["author"].lower() == author.lower():
             for i, book in enumerate(entry["books"]):
-                if book["title"].lower() == title.lower() and book["link"] == link:
-                    entry["books"].pop(i)
-                    found = True
-                    break
-            if not entry["books"]:
-                RAW_DATA.remove(entry)
+                if book["title"].lower() == title.lower():
+                    if book["link"] == link:
+                        deleted_book = entry["books"].pop(i)
+                        found = True
+                        break
+                    else:
+                        matched_no_link.append(book)
             break
+    # If exact link not found but same author+title exists, delete first match
+    if not found and matched_no_link:
+        for entry in RAW_DATA:
+            if entry["author"].lower() == author.lower():
+                for i, book in enumerate(entry["books"]):
+                    if book["title"].lower() == title.lower():
+                        deleted_book = entry["books"].pop(i)
+                        found = True
+                        break
+                break
     if not found:
-        await update.message.reply_text("❌ " + title + " မတွေ့ပါ")
+        msg = f"❌ \"{title}\" မတွေ့ပါ\n\n"
+        # Search for similar entries
+        count = 0
+        for entry in RAW_DATA:
+            if entry["author"].lower() == author.lower():
+                for book in entry["books"]:
+                    count += 1
+                    msg += f"{count}. {book['title']} - {book['link']}\n"
+        if count > 0:
+            msg += f"\n✅ Link အတိအကျနဲ့ ပြန်ရိုက်ပါ:\n/del {author} - {title} - <link>"
+        else:
+            # Author not found - suggest similar authors
+            similar = set()
+            for entry in RAW_DATA:
+                for book in entry["books"]:
+                    if title.lower() in book["title"].lower():
+                        similar.add(entry["author"])
+            if similar:
+                msg += f"\n\nစာရေးသူနာမည် ကွဲနေနိုင်ပါတယ်။ ဤအမည်များနဲ့ စမ်းကြည့်ပါ:\n"
+                msg += "\n".join(f"• {s}" for s in sorted(similar)[:5])
+            else:
+                msg += f"\n\nစာရေးသူ \"{author}\" မတွေ့ပါ။ /authors နဲ့ စစ်ကြည့်ပါ။"
+        await update.message.reply_text(msg)
         return
+    # Clean up empty author entries
+    RAW_DATA[:] = [e for e in RAW_DATA if e.get("books")]
     try:
         success = push_to_github(RAW_DATA, message=f"Del: {author} - {title}")
         if success:
             rebuild_books()
-            msg = "✅ ဖျက်ပြီးပါပြီ!\n\n"
-            msg += "✍️ စာရေးသူ: " + author + "\n"
-            msg += "📖 စာအုပ်: " + title + "\n\n"
-            msg += "📊 စုစုပေါင်း " + str(len(BOOKS)) + " စာအုပ် ကျန်ပါတယ်"
+            msg = f"✅ ဖျက်ပြီးပါပြီ!\n\n"
+            msg += f"✍️ စာရေးသူ: {author}\n"
+            msg += f"📖 စာအုပ်: {title}\n\n"
+            msg += f"📊 စုစုပေါင်း {len(BOOKS)} စာအုပ် ကျန်ပါတယ်"
             await update.message.reply_text(msg)
         else:
             await update.message.reply_text("❌ GitHub push မအောင်မြင်ပါ")
     except Exception as e:
-        sent = await update.message.reply_text("❌ Error: " + str(e))
+        await update.message.reply_text(f"❌ Error: {e}")
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not BOOKS:
         load_books()
