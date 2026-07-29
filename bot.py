@@ -404,7 +404,6 @@ async def cmd_ban(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"❌ Ban မလုပ်နိုင်ပါ: {e}")
     else:
         sent = await update.message.reply_text("ban ချင်တဲ့ message ကို reply ပြီး /ban ရိုက်ပါ")
-        asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_unban(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -429,7 +428,6 @@ async def cmd_unban(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ {target} ကို unban ပြီးပါပြီ")
     except Exception as e:
         sent = await update.message.reply_text(f"❌ Unban မလုပ်နိုင်ပါ: {e}")
-        asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_setwelcome(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -459,7 +457,6 @@ async def cmd_setwelcome(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     sample = _build_message(text, "John", '<a href="tg://user?id=12345">John</a>', WELCOME_ENTITIES)[0]
     preview = "✅ Welcome message set!\n\n📝 Template:\n" + text + "\n\n👀 Preview:\n" + sample
     sent = await update.message.reply_text(preview)
-    asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_setgoodbye(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -489,18 +486,15 @@ async def cmd_setgoodbye(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     sample = _build_message(text, "John", '<a href="tg://user?id=12345">John</a>', GOODBYE_ENTITIES)[0]
     preview = "✅ Goodbye message set!\n\n📝 Template:\n" + text + "\n\n👀 Preview:\n" + sample
     sent = await update.message.reply_text(preview)
-    asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_addhelp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         sent = await update.message.reply_text("\u274c Admin \u1021\u102c \u1000\u103b\u1021\u102c\u1010\u103a\u104c\u1021\u1031\u102c\u1038")
-        asyncio.create_task(schedule_delete(sent))
         return
     text = update.message.text.replace("/addhelp", "", 1).strip()
     if " - " not in text and " – " not in text:
         sent = await update.message.reply_text("Format: /addhelp command - description")
-        asyncio.create_task(schedule_delete(sent))
         return
     for delim in [" - ", " – "]:
         if delim in text:
@@ -510,7 +504,6 @@ async def cmd_addhelp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     description = parts[1].strip()
     if not command or not description:
         sent = await update.message.reply_text("\u274c command \u1021\u1030 description \u1031\u102c\u1038\u1015\u103c\u102e\u1038")
-        asyncio.create_task(schedule_delete(sent))
         return
     result = add_help_item(command, description)
     items = get_help_items()
@@ -519,19 +512,16 @@ async def cmd_addhelp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         + command + " - " + description + "\n\n"
         + "\U0001f4ca Total: " + str(len(items)) + " custom items"
     )
-    asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_delhelp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         sent = await update.message.reply_text("\u274c Admin \u1021\u102c \u1011\u1031\u102c\u1015\u103c\u102e\u1038")
-        asyncio.create_task(schedule_delete(sent))
         return
     text = update.message.text.replace("/delhelp", "", 1).strip()
     parts = text.split(" - ")
     if len(parts) < 1 or not parts[0].strip():
         sent = await update.message.reply_text("Format: /delhelp command")
-        asyncio.create_task(schedule_delete(sent))
         return
     command = parts[0].strip()
     if remove_help_item(command):
@@ -543,23 +533,19 @@ async def cmd_delhelp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
     else:
         sent = await update.message.reply_text("\u274c " + command + " \u1021\u1021\u103e\u102b\u1014\u103a\u1038")
-    asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_addlink(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         sent = await update.message.reply_text("❌ Admin သာ ထည့်ခွင့်ရှိပါတယ်")
-        asyncio.create_task(schedule_delete(sent))
         return
     domain = _parse_dash_arg(update.message.text, "/addlink")
     if not domain:
         sent = await update.message.reply_text("Format: /addlink - www.example.com")
-        asyncio.create_task(schedule_delete(sent))
         return
     domain = domain.lower()
     if not domain:
         sent = await update.message.reply_text("❌ Domain ထည့်ပါ")
-        asyncio.create_task(schedule_delete(sent))
         return
     if add_spam_domain(domain):
         custom = get_spam_domains()
@@ -570,23 +556,19 @@ async def cmd_addlink(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
     else:
         sent = await update.message.reply_text("⚠️ " + domain + " ရှိပြီးသားပါ")
-    asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_dellink(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         sent = await update.message.reply_text("❌ Admin သာ ဖျက်ခွင့်ရှိပါတယ်")
-        asyncio.create_task(schedule_delete(sent))
         return
     domain = _parse_dash_arg(update.message.text, "/dellink")
     if not domain:
         sent = await update.message.reply_text("Format: /dellink - www.example.com")
-        asyncio.create_task(schedule_delete(sent))
         return
     domain = domain.lower()
     if not domain:
         sent = await update.message.reply_text("❌ Domain ထည့်ပါ")
-        asyncio.create_task(schedule_delete(sent))
         return
     removed_spam = remove_spam_domain(domain)
     removed_wl = remove_from_whitelist(domain)
@@ -604,13 +586,11 @@ async def cmd_dellink(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
     else:
         sent = await update.message.reply_text(f"❌ {domain} မတွေ့ပါ")
-    asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_spamlist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         sent = await update.message.reply_text("❌ Admin သာ ကြည့်ခွင့်ရှိပါတယ်")
-        asyncio.create_task(schedule_delete(sent))
         return
     custom = get_spam_domains()
     lines = ["🚫 *Blocked Domains*\n"]
@@ -624,7 +604,6 @@ async def cmd_spamlist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     else:
         lines.append("\nCustom: မရှိသေးပါ")
     sent = await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
-    asyncio.create_task(schedule_delete(sent))
 
 
 # ── Scheduled Messages ──────────────────────────────────
@@ -688,7 +667,6 @@ async def hourly_book_suggestion(ctx: ContextTypes.DEFAULT_TYPE):
                 text=text,
                 reply_markup=keyboard
             )
-            asyncio.create_task(schedule_delete(sent))
         except Exception as e:
             logger.error("Hourly suggestion failed for %s: %s", chat_id, e)
 
@@ -834,7 +812,6 @@ async def cmd_add(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ GitHub push မအောင်မြင်ပါ")
     except Exception as e:
         sent = await update.message.reply_text(f"❌ Error: {e}")
-        asyncio.create_task(schedule_delete(sent))
 
 
 
@@ -886,7 +863,6 @@ async def cmd_del(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ GitHub push မအောင်မြင်ပါ")
     except Exception as e:
         sent = await update.message.reply_text("❌ Error: " + str(e))
-        asyncio.create_task(schedule_delete(sent))
 async def cmd_stats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not BOOKS:
         load_books()
@@ -937,12 +913,10 @@ async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_addalias(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         sent = await update.message.reply_text("❌ Admin သာ ထည့်ခွင့်ရှိပါတယ်")
-        asyncio.create_task(schedule_delete(sent))
         return
     text = " ".join(ctx.args) if ctx.args else ""
     if " = " not in text:
         sent = await update.message.reply_text("Format: /addalias alias = စာရေးသူနာမည်\nဥပမာ - /addalias မင်းကျော် = ကျော်လှိုင်ဦး")
-        asyncio.create_task(schedule_delete(sent))
         return
     parts = text.split(" = ", 1)
     alias = parts[0].strip()
@@ -951,24 +925,20 @@ async def cmd_addalias(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         sent = await update.message.reply_text(f"✅ '{alias}' -> '{canonical}' alias ထည့်ပြီးပါပြီ")
     else:
         sent = await update.message.reply_text("❌ Format: /addalias alias = စာရေးသူနာမည်")
-    asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_delalias(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         sent = await update.message.reply_text("❌ Admin သာ ဖျက်ခွင့်ရှိပါတယ်")
-        asyncio.create_task(schedule_delete(sent))
         return
     if not ctx.args:
         sent = await update.message.reply_text("Format: /delalias alias")
-        asyncio.create_task(schedule_delete(sent))
         return
     alias = " ".join(ctx.args).strip()
     if remove_alias(alias):
         sent = await update.message.reply_text(f"✅ '{alias}' alias ဖျက်ပြီးပါပြီ")
     else:
         sent = await update.message.reply_text(f"⚠️ '{alias}' alias မတွေ့ပါ")
-    asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_aliaslist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -987,47 +957,39 @@ async def cmd_aliaslist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_whitelist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         sent = await update.message.reply_text("❌ Admin သာ ထည့်ခွင့်ရှိပါတယ်")
-        asyncio.create_task(schedule_delete(sent))
         return
     domain = _parse_dash_arg(update.message.text, "/whitelist")
     if not domain:
         sent = await update.message.reply_text("Format: /whitelist - www.example.com")
-        asyncio.create_task(schedule_delete(sent))
         return
     domain = domain.lower()
     if not domain:
         sent = await update.message.reply_text("❌ Domain ထည့်ပါ")
-        asyncio.create_task(schedule_delete(sent))
         return
     if add_to_whitelist(domain):
         wl = get_whitelist()
         sent = await update.message.reply_text(f"✅ Whitelist ထဲ ထည့်ပြီးပါပြီ!\n\n✅ {domain}\n\n📊 Whitelist: {len(wl)} ခု")
     else:
         sent = await update.message.reply_text(f"⚠️ {domain} ရှိပြီးသားပါ")
-    asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_delwhitelist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         sent = await update.message.reply_text("❌ Admin သာ ဖျက်ခွင့်ရှိပါတယ်")
-        asyncio.create_task(schedule_delete(sent))
         return
     domain = _parse_dash_arg(update.message.text, "/delwhitelist")
     if not domain:
         sent = await update.message.reply_text("Format: /delwhitelist - www.example.com")
-        asyncio.create_task(schedule_delete(sent))
         return
     domain = domain.lower()
     if not domain:
         sent = await update.message.reply_text("❌ Domain ထည့်ပါ")
-        asyncio.create_task(schedule_delete(sent))
         return
     if remove_from_whitelist(domain):
         wl = get_whitelist()
         sent = await update.message.reply_text(f"✅ Whitelist က ဖျက်ပြီးပါပြီ!\n\n❌ {domain}\n\n📊 Whitelist: {len(wl)} ခု")
     else:
         sent = await update.message.reply_text(f"❌ {domain} မတွေ့ပါ (default domain ဖြစ်နိုင်ပါတယ်)")
-    asyncio.create_task(schedule_delete(sent))
 
 
 async def cmd_whitelistlist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -1043,35 +1005,47 @@ async def cmd_whitelistlist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_addword(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         sent = await update.message.reply_text("❌ Admin သာ ထည့်ခွင့်ရှိပါတယ်")
-        asyncio.create_task(schedule_delete(sent))
         return
     if not ctx.args:
-        sent = await update.message.reply_text("Format: /Addword စကားလုံး")
-        asyncio.create_task(schedule_delete(sent))
+        sent = await update.message.reply_text("Format: /addword စကားလုံး [စကားလုံး ...]\nဥပမာ - /addword pdf doc ebook")
         return
-    word = " ".join(ctx.args).strip()
-    if add_keyword(word):
-        sent = await update.message.reply_text(f"✅ '{word}' ကို block list ထဲ ထည့်ပြီးပါပြီ")
-    else:
-        sent = await update.message.reply_text(f"⚠️ '{word}' ရှိပြီးသားပါ")
-    asyncio.create_task(schedule_delete(sent))
+    words = [w.strip() for w in " ".join(ctx.args).split() if w.strip()]
+    added = []
+    existed = []
+    for word in words:
+        if add_keyword(word):
+            added.append(word)
+        else:
+            existed.append(word)
+    parts = []
+    if added:
+        parts.append(f"✅ Block ထဲထည့်ပြီးပါပြီ: {', '.join(added)}")
+    if existed:
+        parts.append(f"⚠️ ရှိပြီးသား: {', '.join(existed)}")
+    sent = await update.message.reply_text("\n".join(parts) if parts else "❌ ဘာမှမထည့်ရသေးပါ")
 
 
 async def cmd_delword(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update):
         sent = await update.message.reply_text("❌ Admin သာ ဖျက်ခွင့်ရှိပါတယ်")
-        asyncio.create_task(schedule_delete(sent))
         return
     if not ctx.args:
-        sent = await update.message.reply_text("Format: /Delword စကားလုံး")
-        asyncio.create_task(schedule_delete(sent))
+        sent = await update.message.reply_text("Format: /delword စကားလုံး [စကားလုံး ...]\nဥပမာ - /delword pdf doc")
         return
-    word = " ".join(ctx.args).strip()
-    if remove_keyword(word):
-        sent = await update.message.reply_text(f"✅ '{word}' ကို block list က ဖျက်ပြီးပါပြီ")
-    else:
-        sent = await update.message.reply_text(f"⚠️ '{word}' မတွေ့ပါ")
-    asyncio.create_task(schedule_delete(sent))
+    words = [w.strip() for w in " ".join(ctx.args).split() if w.strip()]
+    deleted = []
+    not_found = []
+    for word in words:
+        if remove_keyword(word):
+            deleted.append(word)
+        else:
+            not_found.append(word)
+    parts = []
+    if deleted:
+        parts.append(f"✅ ဖျက်ပြီးပါပြီ: {', '.join(deleted)}")
+    if not_found:
+        parts.append(f"⚠️ မတွေ့ပါ: {', '.join(not_found)}")
+    sent = await update.message.reply_text("\n".join(parts) if parts else "❌ ဘာမှမဖျက်ရသေးပါ")
 
 
 async def cmd_wordlist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -1086,12 +1060,15 @@ async def cmd_wordlist(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def keyword_filter(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Auto-delete messages containing blocked keywords in groups."""
-    if not update.message or not update.message.text:
+    """Auto-delete messages containing blocked keywords in groups (text + captions)."""
+    if not update.message:
         return
     if update.effective_chat.type not in ("group", "supergroup"):
         return
-    text = update.message.text.lower()
+    # Check both message text and file caption
+    text = (update.message.text or update.message.caption or "").lower()
+    if not text:
+        return
     text_nospace = text.replace(" ", "")
     words = get_keywords()
     for w in words:
@@ -1251,14 +1228,6 @@ async def _do_search(update, ctx, query):
     ctx.bot_data["query_to_key"][query.lower()] = cb_key
     text, markup = _results_page(results, query, page, cb_key)
     sent = await update.message.reply_text(text, reply_markup=markup, parse_mode="Markdown")
-    # Auto-hide search results
-    async def _auto_delete():
-        await asyncio.sleep(AUTO_DELETE_SECONDS)
-        try:
-            await sent.delete()
-        except Exception:
-            pass
-    asyncio.create_task(_auto_delete())
 
 
 def _results_page(results, query, page, cb_key=""):

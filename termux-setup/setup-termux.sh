@@ -43,17 +43,22 @@ fi
 echo ""
 echo "🔑 Step 4: Environment setup..."
 
-# Create .env file if not exists
-if [ ! -f "$BOT_DIR/.env" ]; then
-    echo "Creating .env file..."
-    echo "TELEGRAM_BOT_TOKEN=8644464116:AAGQqzYiRGhTcpOit47AAJW845sBfCSZiX8" > "$BOT_DIR/.env"
-    echo "GITHUB_TOKEN=" >> "$BOT_DIR/.env"
-    echo ""
-    echo "⚠️  .env file created. Edit it with your GITHUB_TOKEN:"
-    echo "   nano $BOT_DIR/.env"
-else
-    echo ".env file already exists."
-fi
+# Prompt for bot token
+echo ""
+echo "📝 Telegram Bot Token ထည့်ပါ (https://t.me/BotFather က token)"
+read -p "TELEGRAM_BOT_TOKEN: " BOT_TOKEN_INPUT
+
+# Create .env file
+echo "Creating .env file..."
+cat > "$BOT_DIR/.env" << ENVEOF
+TELEGRAM_BOT_TOKEN=${BOT_TOKEN_INPUT}
+GITHUB_TOKEN=
+ENVEOF
+echo "✅ .env file created."
+
+echo ""
+echo "⚠️  GITHUB_TOKEN ကို ထည့်ချင်ရင် ဒီမှာပြင်ပါ:"
+echo "   nano $BOT_DIR/.env"
 
 # Create/update start script
 cat > "$BOT_DIR/start.sh" << 'START'
