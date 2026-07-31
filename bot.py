@@ -971,7 +971,7 @@ async def cmd_authors(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_search(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not ctx.args:
-        sent = await update.message.reply_text("အသုံးပြုပုံ - /search စာအုပ်နာမည် (သို့) စာရေးသူ နာမည် ရေးပါ။ /search ရေးပြီး space ခြားပြီးမှာ စာရေးသူ (သို့မဟုတ်) စာအုပ်နာမည် ရေးပါ။\n\nဥပမာ - /search မင်းကျော်")
+        sent = await update.message.reply_text("အသုံးပြုပုံ - /search စာအုပ်နာမည် (သို့) စာရေးသူ နာမည် ရေးပါ။ /search ရေးပြီး space ခြားပြီးမှ စာရေးသူ (သို့မဟုတ်) စာအုပ်နာမည် ရေးပါ။\n\nဥပမာ - /search မင်းကျော်")
         return
     query = " ".join(ctx.args)
     await _do_search(update, ctx, query)
